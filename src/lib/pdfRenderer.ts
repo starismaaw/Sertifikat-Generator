@@ -68,9 +68,13 @@ export async function renderCertificate(
     if (!text) continue;
     const font = await getFont(field.font);
     const size = fitFontSize(text, field, font);
+    // field.y is the TOP of the text box (Konva origin: top-left, y grows down).
+    // pdf-lib drawText y is the BASELINE (origin: bottom-left, y grows up).
+    // Subtract ascent so the visual top of the PDF text aligns with field.y.
+    const ascent = font.heightAtSize(size, { descender: false });
     page.drawText(text, {
       x: alignedX(text, field, font, size),
-      y: event.bgHeight - field.y,        // top-down -> pdf bottom-up
+      y: event.bgHeight - field.y - ascent,
       size,
       font,
       color: hexToRgb(field.warna),
