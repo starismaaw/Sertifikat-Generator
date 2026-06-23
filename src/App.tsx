@@ -1,11 +1,11 @@
-import './App.css'
+import { useView } from './components/AppRouter';
 
-function App() {
+export default function App() {
+  const view = useView();
   return (
-    <>
-      <h1>Sertifikat Generator</h1>
-    </>
-  )
+    <main style={{ fontFamily: 'system-ui', padding: 16 }}>
+      <h1>Generator Sertifikat</h1>
+      <p>View aktif: {view.name}</p>
+    </main>
+  );
 }
-
-export default App
