@@ -4,6 +4,7 @@ import { useEvents } from '../../hooks/useEvents';
 import { getEvent } from '../../lib/eventStore';
 import { navigate } from '../AppRouter';
 import { FieldPalette } from './FieldPalette';
+import { EditorCanvas } from './EditorCanvas';
 
 function newField(tipe: FieldTipe, ev: CertEvent): Field {
   return {
@@ -30,14 +31,14 @@ export function CertificateEditor({ eventId }: { eventId: string }) {
     setSelectedId(f.id);
   };
 
-  void selectedId; // used in Task 12 by FieldProperties
+  const moveField = (id: string, x: number, y: number) =>
+    update({ ...event, fields: event.fields.map(f => f.id === id ? { ...f, x, y } : f) });
 
   return (
     <div style={{ display: 'flex', gap: 12 }}>
       <FieldPalette onAdd={addField} used={used} />
-      <div style={{ flex: 1 }} id="editor-canvas-slot">
-        {/* EditorCanvas mounts here in Task 11 */}
-        <p>Kanvas akan tampil di sini.</p>
+      <div style={{ flex: 1 }}>
+        <EditorCanvas event={event} selectedId={selectedId} onSelect={setSelectedId} onMove={moveField} />
       </div>
       <div style={{ width: 220 }} id="editor-props-slot">
         {/* FieldProperties mounts here in Task 12 */}
