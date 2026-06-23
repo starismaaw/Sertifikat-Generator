@@ -1,19 +1,20 @@
-import { useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Stage, Layer, Image as KImage, Text } from 'react-konva';
 import type Konva from 'konva';
-import type { CertEvent, Field } from '../../types';
+import type { CertEvent } from '../../types';
 import { FIELD_LABELS } from './FieldPalette';
 
 const MAX_W = 700; // max on-screen canvas width
 
+// BUG 1 fix: useState + useEffect so React re-renders when image loads
 function useHtmlImage(src: string): HTMLImageElement | undefined {
-  const ref = useRef<HTMLImageElement>();
-  if (!ref.current || ref.current.src !== src) {
-    const img = new window.Image();
-    img.src = src;
-    ref.current = img;
-  }
-  return ref.current;
+  const [img, setImg] = useState<HTMLImageElement | undefined>(undefined);
+  useEffect(() => {
+    const image = new window.Image();
+    image.onload = () => setImg(image);
+    image.src = src;
+  }, [src]);
+  return img;
 }
 
 export function EditorCanvas({
@@ -26,10 +27,6 @@ export function EditorCanvas({
 }) {
   const scale = Math.min(1, MAX_W / event.bgWidth);
   const img = useHtmlImage(event.background);
-
-  const handleDrag = (f: Field) => (e: Konva.KonvaEventObject<DragEvent>) => {
-    onMove(f.id, e.target.x() / scale, e.target.y() / scale);
-  };
 
   return (
     <Stage width={event.bgWidth * scale} height={event.bgHeight * scale}
@@ -44,11 +41,17 @@ export function EditorCanvas({
             y={f.y * scale}
             fontSize={f.ukuran * scale}
             fill={f.warna}
+            width={f.lebar * scale}
+            align={f.perataan}
             draggable
             onClick={() => onSelect(f.id)}
             onTap={() => onSelect(f.id)}
-            onDragStart={() => onSelect(f.id)}
-            onDragEnd={handleDrag(f)}
+            onDragEnd={(e: Konva.KonvaEventObject<DragEvent>) => {
+              const x = e.target.x() / scale;
+              const y = e.target.y() / scale;
+              onSelect(f.id);
+              onMove(f.id, x, y);
+            }}
             stroke={selectedId === f.id ? '#1e90ff' : undefined}
             strokeWidth={selectedId === f.id ? 0.5 : 0}
           />

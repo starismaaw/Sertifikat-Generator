@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { CertEvent, Field, FieldTipe } from '../../types';
 import { useEvents } from '../../hooks/useEvents';
-import { getEvent } from '../../lib/eventStore';
+import { getEvent, saveEvent } from '../../lib/eventStore';
 import { navigate } from '../AppRouter';
 import { FieldPalette } from './FieldPalette';
 import { EditorCanvas } from './EditorCanvas';
@@ -31,8 +31,15 @@ export function CertificateEditor({ eventId }: { eventId: string }) {
     setSelectedId(f.id);
   };
 
-  const moveField = (id: string, x: number, y: number) =>
-    update({ ...event, fields: event.fields.map(f => f.id === id ? { ...f, x, y } : f) });
+  // BUG 2 fix: functional updater prevents stale closure when drags fire rapidly
+  const moveField = (id: string, x: number, y: number) => {
+    setEvent(prev => {
+      if (!prev) return prev;
+      const next = { ...prev, fields: prev.fields.map(f => f.id === id ? { ...f, x, y } : f) };
+      saveEvent(next);
+      return next;
+    });
+  };
 
   return (
     <div style={{ display: 'flex', gap: 12 }}>
