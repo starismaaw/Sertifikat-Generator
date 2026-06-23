@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useEvents } from '../hooks/useEvents';
 import { loadImage } from '../lib/image';
 import { navigate } from './AppRouter';
+import { Reveal } from './Reveal';
 import type { CertEvent } from '../types';
 
 export function EventList() {
@@ -29,24 +30,55 @@ export function EventList() {
 
   return (
     <section>
-      <h2>Daftar Acara</h2>
-      <label style={{ display: 'inline-block', margin: '8px 0', cursor: 'pointer' }}>
-        <strong>+ Acara Baru</strong> (pilih background)
-        <input type="file" accept="image/png,image/jpeg" hidden
-          onChange={e => e.target.files?.[0] && handleNew(e.target.files[0])} />
-      </label>
-      {error && <p style={{ color: 'crimson' }}>{error}</p>}
-      <ul>
-        {events.map(ev => (
-          <li key={ev.id} style={{ margin: '6px 0' }}>
-            {ev.nama} — {ev.tanggal}{' '}
-            <button onClick={() => navigate({ name: 'editor', eventId: ev.id })}>Edit Template</button>{' '}
-            <button onClick={() => navigate({ name: 'generate', eventId: ev.id })}>Generate</button>{' '}
-            <button onClick={() => confirm(`Hapus "${ev.nama}"?`) && remove(ev.id)}>Hapus</button>
-          </li>
+      <Reveal>
+        <div className="apple-flex-row apple-space-between apple-mb-lg">
+          <div>
+            <span className="apple-eyebrow">Dashboard</span>
+            <h2 className="apple-h1">Acara</h2>
+          </div>
+          <label className="apple-btn apple-btn-primary" style={{ cursor: 'pointer' }}>
+            + Acara Baru
+            <input type="file" accept="image/png,image/jpeg" hidden
+              onChange={e => e.target.files?.[0] && handleNew(e.target.files[0])} />
+          </label>
+        </div>
+      </Reveal>
+      {error && <div className="apple-error">{error}</div>}
+      <div className="apple-flex-col">
+        {events.map((ev, i) => (
+          <Reveal key={ev.id} delay={(i % 4) as 0 | 1 | 2 | 3}>
+            <div className="apple-card">
+              <div className="apple-card-header">
+                <div>
+                  <div className="apple-h4">{ev.nama}</div>
+                  <div className="apple-caption">{ev.tanggal} · {ev.fields.length} field</div>
+                </div>
+                <div className="apple-flex-row">
+                  <button className="apple-btn apple-btn-primary apple-btn-sm"
+                    onClick={() => navigate({ name: 'editor', eventId: ev.id })}>
+                    Edit
+                  </button>
+                  <button className="apple-btn apple-btn-secondary apple-btn-sm"
+                    onClick={() => navigate({ name: 'generate', eventId: ev.id })}>
+                    Generate
+                  </button>
+                  <button className="apple-btn apple-btn-danger apple-btn-sm"
+                    onClick={() => confirm(`Hapus "${ev.nama}"?`) && remove(ev.id)}>
+                    Hapus
+                  </button>
+                </div>
+              </div>
+            </div>
+          </Reveal>
         ))}
-        {events.length === 0 && <li>Belum ada acara.</li>}
-      </ul>
+        {events.length === 0 && (
+          <Reveal delay={1}>
+            <div className="apple-empty">
+              Belum ada acara. Klik "+ Acara Baru" untuk memulai.
+            </div>
+          </Reveal>
+        )}
+      </div>
     </section>
   );
 }

@@ -17,8 +17,6 @@ export function GenerateBulk({ event }: { event: CertEvent }) {
   const [error, setError] = useState('');
   const [progress, setProgress] = useState<number | null>(null);
 
-  // Preview numbers are illustrative (start from nomorTerakhir+1); real numbers
-  // are claimed atomically at generation time so concurrent runs never collide.
   const validCount = useMemo(() => rows.filter(r => r.valid).length, [rows]);
 
   const previewNumbers = useMemo(() => {
@@ -57,8 +55,6 @@ export function GenerateBulk({ event }: { event: CertEvent }) {
     try {
       for (const r of rows) {
         if (!r.valid) continue;
-        // Claim first to get authoritative number, then render.
-        // Single-user internal tool — no concurrent writes in normal use.
         const n = claimNextNumber(event.id);
         const values = resolveValues(event, r.values, n);
         const bytes = await renderCertificate(event, values);
@@ -76,20 +72,40 @@ export function GenerateBulk({ event }: { event: CertEvent }) {
   }
 
   return (
-    <section>
-      <h3>Massal</h3>
-      <input type="file" accept=".csv,.xlsx,.xls" onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])} />
-      {error && <p style={{ color: 'crimson' }}>{error}</p>}
+    <div className="apple-card">
+      <h3 className="apple-h3 apple-mb-md">Massal</h3>
+      <div className="apple-form-group">
+        <label className="apple-label">Upload file peserta</label>
+        <input className="apple-input" type="file" accept=".csv,.xlsx,.xls"
+          onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])}
+          style={{ padding: 8, fontSize: 14 }} />
+        <span className="apple-hint">Format: CSV atau Excel (.xlsx/.xls)</span>
+      </div>
+      {error && <div className="apple-error">{error}</div>}
       {headers.length > 0 && (
         <>
           <ColumnMapper headers={headers} mapping={mapping} onChange={remap} />
-          <p>{validCount} valid / {rows.length} baris</p>
+          <div className="apple-flex-row apple-mb-sm">
+            <span className="apple-caption">{validCount} valid</span>
+            <span className="apple-caption">·</span>
+            <span className="apple-caption">{rows.length} baris</span>
+          </div>
           <BulkPreviewTable rows={rows} numbers={previewNumbers} />
-          <button disabled={progress !== null} onClick={generate} style={{ marginTop: 8 }}>
-            {progress === null ? 'Generate & Unduh ZIP' : `Memproses… ${progress}%`}
-          </button>
+          <div className="apple-flex-row apple-mt-md">
+            <button className="apple-btn apple-btn-primary apple-btn-lg" disabled={progress !== null} onClick={generate}>
+              {progress === null ? 'Generate & Unduh ZIP' : `Memproses… ${progress}%`}
+            </button>
+            {progress !== null && (
+              <div className="apple-progress" style={{ flex: 1 }}>
+                <div className="apple-progress-track">
+                  <div className="apple-progress-fill" style={{ width: `${progress}%` }} />
+                </div>
+                <span className="apple-progress-label">{progress}%</span>
+              </div>
+            )}
+          </div>
         </>
       )}
-    </section>
+    </div>
   );
 }

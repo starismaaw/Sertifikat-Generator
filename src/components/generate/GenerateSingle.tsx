@@ -17,14 +17,11 @@ export function GenerateSingle({ event }: { event: CertEvent }) {
     if (!trimmedNama) { setError('Nama wajib diisi'); return; }
     setBusy(true);
     try {
-      // read live event so previewN is never stale (user may have generated in bulk tab)
       const liveEvent = getEvent(event.id);
       if (!liveEvent) throw new Error('Acara tidak ditemukan');
       const previewN = Math.max(liveEvent.nomorTerakhir + 1, liveEvent.nomorMulai);
       const values = resolveValues(liveEvent, { nama: trimmedNama, peran }, previewN);
-      // render may throw — number not claimed yet
       const bytes = await renderCertificate(liveEvent, values);
-      // render succeeded — now claim atomically
       claimNextNumber(liveEvent.id);
       downloadBlob(bytes, `Sertifikat - ${trimmedNama}.pdf`);
     } catch (e) {
@@ -35,15 +32,26 @@ export function GenerateSingle({ event }: { event: CertEvent }) {
   }
 
   return (
-    <section>
-      <h3>Satuan</h3>
-      <label>Nama <input value={nama} onChange={e => setNama(e.target.value)} /></label>{' '}
-      <label>Peran{' '}
-        <select value={peran} onChange={e => setPeran(e.target.value)}>
-          <option>Peserta</option><option>Narasumber</option><option>Panitia</option>
-        </select></label>{' '}
-      <button disabled={busy} onClick={generate}>{busy ? 'Memproses…' : 'Unduh PDF'}</button>
-      {error && <p style={{ color: 'crimson' }}>{error}</p>}
-    </section>
+    <div className="apple-card">
+      <span className="apple-eyebrow">Cetak Satu</span>
+      <h3 className="apple-h3 apple-mb-md">Satuan</h3>
+      <div className="apple-flex-row">
+        <div className="apple-form-group" style={{ flex: 1 }}>
+          <label className="apple-label">Nama <span className="apple-fine">*</span></label>
+          <input className="apple-input" value={nama} onChange={e => setNama(e.target.value)}
+            placeholder="Nama peserta" />
+        </div>
+        <div className="apple-form-group">
+          <label className="apple-label">Peran</label>
+          <select className="apple-select" value={peran} onChange={e => setPeran(e.target.value)}>
+            <option>Peserta</option><option>Narasumber</option><option>Panitia</option>
+          </select>
+        </div>
+      </div>
+      {error && <div className="apple-error">{error}</div>}
+      <button className="apple-btn apple-btn-primary apple-btn-lg apple-mt-sm" disabled={busy} onClick={generate}>
+        {busy ? 'Memproses…' : 'Unduh PDF'}
+      </button>
+    </div>
   );
 }
