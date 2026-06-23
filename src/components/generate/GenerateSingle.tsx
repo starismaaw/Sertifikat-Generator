@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { CertEvent, FieldValues } from '../../types';
+import type { CertEvent } from '../../types';
 import { claimNextNumber } from '../../lib/eventStore';
 import { resolveValues } from '../../lib/resolveValues';
 import { renderCertificate } from '../../lib/pdfRenderer';
@@ -13,15 +13,20 @@ export function GenerateSingle({ event }: { event: CertEvent }) {
 
   async function generate() {
     setError('');
-    if (!nama.trim()) { setError('Nama wajib diisi'); return; }
+    const trimmedNama = nama.trim();
+    if (!trimmedNama) { setError('Nama wajib diisi'); return; }
     setBusy(true);
     try {
-      const n = claimNextNumber(event.id);
-      const values: FieldValues = resolveValues(event, { nama: nama.trim(), peran }, n);
+      // compute the next number without claiming it yet
+      const previewN = Math.max(event.nomorTerakhir + 1, event.nomorMulai);
+      const values = resolveValues(event, { nama: trimmedNama, peran }, previewN);
+      // render may throw — number not claimed yet
       const bytes = await renderCertificate(event, values);
-      downloadBlob(bytes, `Sertifikat - ${nama.trim()}.pdf`);
+      // render succeeded — now claim atomically
+      claimNextNumber(event.id);
+      downloadBlob(bytes, `Sertifikat - ${trimmedNama}.pdf`);
     } catch (e) {
-      setError((e as Error).message);
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
