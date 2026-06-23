@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import type { CertEvent, FieldTipe, FieldValues } from '../../types';
+import { useState, useMemo } from 'react';
+import type { CertEvent, FieldTipe } from '../../types';
 import { parseFile, applyMapping, validateRows, type ValidatedRow } from '../../lib/dataImporter';
 import { buildCertNumber } from '../../lib/numberFormatter';
 import { claimNextNumber } from '../../lib/eventStore';
@@ -19,10 +19,14 @@ export function GenerateBulk({ event }: { event: CertEvent }) {
 
   // Preview numbers are illustrative (start from nomorTerakhir+1); real numbers
   // are claimed atomically at generation time so concurrent runs never collide.
-  const validCount = rows.filter(r => r.valid).length;
-  let seq = Math.max(event.nomorTerakhir + 1, event.nomorMulai);
-  const previewNumbers = rows.map(r =>
-    r.valid ? buildCertNumber(event.polaNomor, seq++, event.nomorPadding, new Date(event.tanggal)) : '');
+  const validCount = useMemo(() => rows.filter(r => r.valid).length, [rows]);
+
+  const previewNumbers = useMemo(() => {
+    let seq = Math.max(event.nomorTerakhir + 1, event.nomorMulai);
+    return rows.map(r =>
+      r.valid ? buildCertNumber(event.polaNomor, seq++, event.nomorPadding, new Date(event.tanggal)) : ''
+    );
+  }, [rows, event]);
 
   async function handleFile(file: File) {
     setError('');
@@ -49,22 +53,26 @@ export function GenerateBulk({ event }: { event: CertEvent }) {
     setError('');
     const files: { name: string; bytes: Uint8Array }[] = [];
     let done = 0;
-    for (const r of rows) {
-      if (!r.valid) continue;
-      // Render first with preview number so we don't claim a number for a failed render.
-      // claimNextNumber reads live from storage each call, so sequential claims are safe.
-      const startN = Math.max(event.nomorTerakhir + 1, event.nomorMulai);
-      const previewN = startN + done;
-      const previewValues: FieldValues = resolveValues(event, r.values, previewN);
-      const bytes = await renderCertificate(event, previewValues);
-      // Render succeeded — now claim atomically (returns the same number as previewN for sequential runs)
-      claimNextNumber(event.id);
-      files.push({ name: `Sertifikat - ${previewValues.nama}.pdf`, bytes });
-      setProgress(Math.round((++done / validCount) * 100));
+    setProgress(0);
+    try {
+      for (const r of rows) {
+        if (!r.valid) continue;
+        // Claim first to get authoritative number, then render.
+        // Single-user internal tool — no concurrent writes in normal use.
+        const n = claimNextNumber(event.id);
+        const values = resolveValues(event, r.values, n);
+        const bytes = await renderCertificate(event, values);
+        files.push({ name: `Sertifikat - ${values.nama ?? ''}.pdf`, bytes });
+        done++;
+        setProgress(Math.round((done / validCount) * 100));
+      }
+      const zip = await buildZip(files);
+      downloadBlob(zip, `Sertifikat - ${event.nama}.zip`, 'application/zip');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setProgress(null);
     }
-    const zip = await buildZip(files);
-    downloadBlob(zip, `Sertifikat - ${event.nama}.zip`, 'application/zip');
-    setProgress(null);
   }
 
   return (
