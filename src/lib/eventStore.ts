@@ -14,7 +14,11 @@ function readAll(): CertEvent[] {
 }
 
 function writeAll(events: CertEvent[]): void {
-  localStorage.setItem(KEY, JSON.stringify(events));
+  try {
+    localStorage.setItem(KEY, JSON.stringify(events));
+  } catch (e) {
+    throw new Error('Penyimpanan penuh. Hapus acara lama untuk melanjutkan.');
+  }
 }
 
 export function listEvents(): CertEvent[] {
