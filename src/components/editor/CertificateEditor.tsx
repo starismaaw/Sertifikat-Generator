@@ -3,6 +3,7 @@ import type { CertEvent, Field, FieldTipe } from '../../types';
 import { useEvents } from '../../hooks/useEvents';
 import { getEvent, saveEvent } from '../../lib/eventStore';
 import { navigate } from '../AppRouter';
+import { Reveal } from '../Reveal';
 import { FieldPalette } from './FieldPalette';
 import { EditorCanvas } from './EditorCanvas';
 import { FieldProperties } from './FieldProperties';
@@ -32,7 +33,6 @@ export function CertificateEditor({ eventId }: { eventId: string }) {
     setSelectedId(f.id);
   };
 
-  // BUG 2 fix: functional updater prevents stale closure when drags fire rapidly
   const moveField = (id: string, x: number, y: number) => {
     setEvent(prev => {
       if (!prev) return prev;
@@ -55,15 +55,29 @@ export function CertificateEditor({ eventId }: { eventId: string }) {
   };
 
   return (
-    <div style={{ display: 'flex', gap: 12 }}>
-      <FieldPalette onAdd={addField} used={used} />
-      <div style={{ flex: 1 }}>
-        <EditorCanvas event={event} selectedId={selectedId} onSelect={setSelectedId} onMove={moveField} />
-      </div>
-      <div style={{ width: 240 }}>
-        <button onClick={() => navigate({ name: 'home' })}>← Daftar Acara</button>
-        <FieldProperties event={event} selected={selected}
-          onField={patchField} onEvent={patchEvent} onDelete={deleteField} />
+    <div>
+      <Reveal>
+        <div className="apple-flex-row apple-mb-md">
+          <button className="apple-btn apple-btn-ghost" onClick={() => navigate({ name: 'home' })}>
+            ← Kembali
+          </button>
+        </div>
+      </Reveal>
+      <Reveal delay={1}>
+        <div>
+          <span className="apple-eyebrow">Editor Template</span>
+          <h2 className="apple-h1 apple-mb-lg">{event.nama}</h2>
+        </div>
+      </Reveal>
+      <div className="apple-editor-layout">
+        <Reveal delay={2}><FieldPalette onAdd={addField} used={used} /></Reveal>
+        <Reveal delay={3} className="apple-editor-center">
+          <EditorCanvas event={event} selectedId={selectedId} onSelect={setSelectedId} onMove={moveField} />
+        </Reveal>
+        <Reveal delay={2}>
+          <FieldProperties event={event} selected={selected}
+            onField={patchField} onEvent={patchEvent} onDelete={deleteField} />
+        </Reveal>
       </div>
     </div>
   );

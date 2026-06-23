@@ -8,14 +8,16 @@ const LABELS: Record<FieldTipe, string> = {
 
 export function FieldPalette({ onAdd, used }: { onAdd: (t: FieldTipe) => void; used: Set<FieldTipe> }) {
   return (
-    <div style={{ width: 160 }}>
-      <h3>Field</h3>
-      {(Object.keys(LABELS) as FieldTipe[]).map(t => (
-        <button key={t} disabled={used.has(t)} onClick={() => onAdd(t)}
-          style={{ display: 'block', width: '100%', margin: '4px 0', textAlign: 'left' }}>
-          + {LABELS[t]}
-        </button>
-      ))}
+    <div className="apple-editor-sidebar">
+      <h3 className="apple-h4 apple-mb-sm">Field</h3>
+      <div className="apple-field-list">
+        {(Object.keys(LABELS) as FieldTipe[]).map(t => (
+          <button key={t} className="apple-field-btn" disabled={used.has(t)} onClick={() => onAdd(t)}>
+            + {LABELS[t]}
+          </button>
+        ))}
+      </div>
+      <p className="apple-caption apple-mt-sm">Setiap tipe field hanya bisa ditambahkan sekali.</p>
     </div>
   );
 }
