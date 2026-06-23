@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { CertEvent } from '../../types';
-import { claimNextNumber } from '../../lib/eventStore';
+import { claimNextNumber, getEvent } from '../../lib/eventStore';
 import { resolveValues } from '../../lib/resolveValues';
 import { renderCertificate } from '../../lib/pdfRenderer';
 import { downloadBlob } from '../../lib/download';
@@ -17,13 +17,15 @@ export function GenerateSingle({ event }: { event: CertEvent }) {
     if (!trimmedNama) { setError('Nama wajib diisi'); return; }
     setBusy(true);
     try {
-      // compute the next number without claiming it yet
-      const previewN = Math.max(event.nomorTerakhir + 1, event.nomorMulai);
-      const values = resolveValues(event, { nama: trimmedNama, peran }, previewN);
+      // read live event so previewN is never stale (user may have generated in bulk tab)
+      const liveEvent = getEvent(event.id);
+      if (!liveEvent) throw new Error('Acara tidak ditemukan');
+      const previewN = Math.max(liveEvent.nomorTerakhir + 1, liveEvent.nomorMulai);
+      const values = resolveValues(liveEvent, { nama: trimmedNama, peran }, previewN);
       // render may throw — number not claimed yet
-      const bytes = await renderCertificate(event, values);
+      const bytes = await renderCertificate(liveEvent, values);
       // render succeeded — now claim atomically
-      claimNextNumber(event.id);
+      claimNextNumber(liveEvent.id);
       downloadBlob(bytes, `Sertifikat - ${trimmedNama}.pdf`);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));

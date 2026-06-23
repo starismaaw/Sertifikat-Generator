@@ -62,7 +62,7 @@ export function GenerateBulk({ event }: { event: CertEvent }) {
         const n = claimNextNumber(event.id);
         const values = resolveValues(event, r.values, n);
         const bytes = await renderCertificate(event, values);
-        files.push({ name: `Sertifikat - ${values.nama ?? ''}.pdf`, bytes });
+        files.push({ name: `Sertifikat - ${String(n).padStart(event.nomorPadding, '0')} - ${values.nama ?? ''}.pdf`, bytes });
         done++;
         setProgress(Math.round((done / validCount) * 100));
       }
