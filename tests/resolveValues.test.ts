@@ -18,6 +18,6 @@ describe('resolveValues', () => {
     expect(v.tanggal).toBe('2026-06-15');
     expect(v.namaPenandatangan).toBe('Dr. X');
     expect(v.penandatangan).toBe('Kepala');
-    expect(v.nomor).toBe('007/2026');
+    expect(v.nomor).toBe('Nomor: 007/2026');
   });
 });

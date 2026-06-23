@@ -15,7 +15,7 @@ export function resolveValues(
     tanggal: event.tanggal,
     namaPenandatangan: event.penandatangan.nama,
     penandatangan: event.penandatangan.jabatan,
-    nomor: buildCertNumber(
+    nomor: 'Nomor: ' + buildCertNumber(
       event.polaNomor,
       claimedNumber,
       event.nomorPadding,
