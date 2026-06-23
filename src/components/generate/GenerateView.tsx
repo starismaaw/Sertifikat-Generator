@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { getEvent } from '../../lib/eventStore';
 import { navigate } from '../AppRouter';
 import { GenerateSingle } from './GenerateSingle';
+import { GenerateBulk } from './GenerateBulk';
 
 export function GenerateView({ eventId }: { eventId: string }) {
   const event = getEvent(eventId);
@@ -17,7 +18,7 @@ export function GenerateView({ eventId }: { eventId: string }) {
       <button onClick={() => setTab('single')} disabled={tab === 'single'}>Satuan</button>{' '}
       <button onClick={() => setTab('bulk')} disabled={tab === 'bulk'}>Massal</button>
       {tab === 'single' && <GenerateSingle event={event} />}
-      {tab === 'bulk' && <p>Mode massal di task berikutnya.</p>}
+      {tab === 'bulk' && <GenerateBulk event={event} />}
     </section>
   );
 }
