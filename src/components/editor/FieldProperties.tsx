@@ -9,54 +9,111 @@ function safeNum(val: string, fallback: number): number {
 const ALIGNS: Perataan[] = ['left', 'center', 'right'];
 
 export function FieldProperties({
-  event, selected, onField, onEvent, onDelete,
+  event, selected, onField, onEvent, onDelete, onMove,
 }: {
   event: CertEvent;
   selected: Field | undefined;
   onField: (patch: Partial<Field>) => void;
   onEvent: (patch: Partial<CertEvent>) => void;
   onDelete: () => void;
+  onMove: (id: string, x: number, y: number) => void;
 }) {
   return (
-    <div>
-      <h3>Pengaturan Acara</h3>
-      <label>Nama acara<br />
-        <input value={event.nama} onChange={e => onEvent({ nama: e.target.value })} /></label><br />
-      <label>Tanggal<br />
-        <input type="date" value={event.tanggal} onChange={e => onEvent({ tanggal: e.target.value })} /></label><br />
-      <label>Pola nomor<br />
-        <input value={event.polaNomor} onChange={e => onEvent({ polaNomor: e.target.value })} /></label>
-      <small> — {'{n}'} {'{bulan}'} {'{tahun}'}</small><br />
-      <label>Nomor mulai <input type="number" style={{ width: 60 }} value={event.nomorMulai}
-        onChange={e => onEvent({ nomorMulai: safeNum(e.target.value, event.nomorMulai) })} /></label>{' '}
-      <label>Padding <input type="number" style={{ width: 50 }} value={event.nomorPadding}
-        onChange={e => onEvent({ nomorPadding: safeNum(e.target.value, event.nomorPadding) })} /></label><br />
-      <label>Penandatangan (nama)<br />
-        <input value={event.penandatangan.nama}
-          onChange={e => onEvent({ penandatangan: { ...event.penandatangan, nama: e.target.value } })} /></label><br />
-      <label>Penandatangan (jabatan)<br />
-        <input value={event.penandatangan.jabatan}
-          onChange={e => onEvent({ penandatangan: { ...event.penandatangan, jabatan: e.target.value } })} /></label>
+    <div className="apple-editor-sidebar-right">
+      <h3 className="apple-h4 apple-mb-sm">Pengaturan Acara</h3>
+      <div className="apple-form-group">
+        <label className="apple-label">Nama acara</label>
+        <input className="apple-input" value={event.nama} onChange={e => onEvent({ nama: e.target.value })} />
+      </div>
+      <div className="apple-form-group">
+        <label className="apple-label">Tanggal</label>
+        <input className="apple-input" type="date" value={event.tanggal} onChange={e => onEvent({ tanggal: e.target.value })} />
+      </div>
+      <div className="apple-form-group">
+        <label className="apple-label">Pola nomor</label>
+        <input className="apple-input" value={event.polaNomor} onChange={e => onEvent({ polaNomor: e.target.value })} />
+        <span className="apple-hint">{'{n'} {'{bulan}'} {'{tahun}'}</span>
+      </div>
+      <div className="apple-flex-row">
+        <div className="apple-form-group">
+          <label className="apple-label">Mulai</label>
+          <input className="apple-input apple-input-sm" type="number" style={{ width: 70 }} value={event.nomorMulai}
+            onChange={e => onEvent({ nomorMulai: safeNum(e.target.value, event.nomorMulai) })} />
+        </div>
+        <div className="apple-form-group">
+          <label className="apple-label">Padding</label>
+          <input className="apple-input apple-input-sm" type="number" style={{ width: 60 }} value={event.nomorPadding}
+            onChange={e => onEvent({ nomorPadding: safeNum(e.target.value, event.nomorPadding) })} />
+        </div>
+      </div>
+      <div className="apple-form-group">
+        <label className="apple-label">Penandatangan (nama)</label>
+        <input className="apple-input" value={event.penandatangan.nama}
+          onChange={e => onEvent({ penandatangan: { ...event.penandatangan, nama: e.target.value } })} />
+      </div>
+      <div className="apple-form-group">
+        <label className="apple-label">Penandatangan (jabatan)</label>
+        <input className="apple-input" value={event.penandatangan.jabatan}
+          onChange={e => onEvent({ penandatangan: { ...event.penandatangan, jabatan: e.target.value } })} />
+      </div>
 
-      <h3>Properti Field</h3>
-      {!selected && <p><em>Pilih field di kanvas.</em></p>}
+      <hr className="apple-field-divider" />
+      <h3 className="apple-h4 apple-mb-sm">Properti Field</h3>
+      {!selected && <p className="apple-caption">Pilih field di kanvas.</p>}
       {selected && (
         <>
-          <label>Font{' '}
-            <select value={selected.font} onChange={e => onField({ font: e.target.value as Field['font'] })}>
+          <div className="apple-form-group">
+            <label className="apple-label">Font</label>
+            <select className="apple-select" value={selected.font} onChange={e => onField({ font: e.target.value as Field['font'] })}>
               {FONTS.map(f => <option key={f}>{f}</option>)}
-            </select></label><br />
-          <label>Ukuran <input type="number" style={{ width: 60 }} value={selected.ukuran}
-            onChange={e => onField({ ukuran: safeNum(e.target.value, selected.ukuran) })} /></label><br />
-          <label>Warna <input type="color" value={selected.warna}
-            onChange={e => onField({ warna: e.target.value })} /></label><br />
-          <label>Lebar <input type="number" style={{ width: 70 }} value={Math.round(selected.lebar)}
-            onChange={e => onField({ lebar: safeNum(e.target.value, selected.lebar) })} /></label><br />
-          <label>Perataan{' '}
-            <select value={selected.perataan} onChange={e => onField({ perataan: e.target.value as Perataan })}>
+            </select>
+          </div>
+          <div className="apple-flex-row">
+            <div className="apple-form-group">
+              <label className="apple-label">Posisi X</label>
+              <input className="apple-input apple-input-sm" type="number" style={{ width: 70 }} value={Math.round(selected.x)}
+                onChange={e => onMove(selected.id, safeNum(e.target.value, selected.x), selected.y)} />
+            </div>
+            <div className="apple-form-group">
+              <label className="apple-label">Posisi Y</label>
+              <input className="apple-input apple-input-sm" type="number" style={{ width: 70 }} value={Math.round(selected.y)}
+                onChange={e => onMove(selected.id, selected.x, safeNum(e.target.value, selected.y))} />
+            </div>
+          </div>
+          <div className="apple-flex-row">
+            <div className="apple-form-group">
+              <label className="apple-label">Ukuran</label>
+              <input className="apple-input apple-input-sm" type="number" style={{ width: 70 }} value={selected.ukuran}
+                onChange={e => onField({ ukuran: safeNum(e.target.value, selected.ukuran) })} />
+            </div>
+            <div className="apple-form-group">
+              <label className="apple-label">Lebar</label>
+              <input className="apple-input apple-input-sm" type="number" style={{ width: 80 }} value={Math.round(selected.lebar)}
+                onChange={e => onField({ lebar: safeNum(e.target.value, selected.lebar) })} />
+            </div>
+          </div>
+          <button
+            className="apple-btn apple-btn-secondary apple-mt-xs"
+            style={{ width: '100%', marginBottom: 4 }}
+            onClick={() => {
+              onMove(selected.id, 0, selected.y);
+              onField({ lebar: event.bgWidth, perataan: 'center' });
+            }}
+          >
+            Tengahkan Horizontal
+          </button>
+          <div className="apple-form-group">
+            <label className="apple-label">Warna</label>
+            <input className="apple-input" type="color" value={selected.warna}
+              onChange={e => onField({ warna: e.target.value })} style={{ padding: 4, height: 40 }} />
+          </div>
+          <div className="apple-form-group">
+            <label className="apple-label">Perataan</label>
+            <select className="apple-select" value={selected.perataan} onChange={e => onField({ perataan: e.target.value as Perataan })}>
               {ALIGNS.map(a => <option key={a}>{a}</option>)}
-            </select></label><br />
-          <button onClick={onDelete} style={{ marginTop: 8, color: 'crimson' }}>Hapus field</button>
+            </select>
+          </div>
+          <button className="apple-btn apple-btn-danger apple-mt-sm" onClick={onDelete}>Hapus field</button>
         </>
       )}
     </div>
