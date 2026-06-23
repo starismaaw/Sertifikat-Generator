@@ -5,6 +5,7 @@ import { getEvent, saveEvent } from '../../lib/eventStore';
 import { navigate } from '../AppRouter';
 import { FieldPalette } from './FieldPalette';
 import { EditorCanvas } from './EditorCanvas';
+import { FieldProperties } from './FieldProperties';
 
 function newField(tipe: FieldTipe, ev: CertEvent): Field {
   return {
@@ -41,15 +42,26 @@ export function CertificateEditor({ eventId }: { eventId: string }) {
     });
   };
 
+  const selected = event.fields.find(f => f.id === selectedId);
+  const patchField = (patch: Partial<Field>) =>
+    selected && update({ ...event, fields: event.fields.map(f => f.id === selected.id ? { ...f, ...patch } : f) });
+  const patchEvent = (patch: Partial<CertEvent>) => update({ ...event, ...patch });
+  const deleteField = () => {
+    if (!selected) return;
+    update({ ...event, fields: event.fields.filter(f => f.id !== selected.id) });
+    setSelectedId(null);
+  };
+
   return (
     <div style={{ display: 'flex', gap: 12 }}>
       <FieldPalette onAdd={addField} used={used} />
       <div style={{ flex: 1 }}>
         <EditorCanvas event={event} selectedId={selectedId} onSelect={setSelectedId} onMove={moveField} />
       </div>
-      <div style={{ width: 220 }} id="editor-props-slot">
-        {/* FieldProperties mounts here in Task 12 */}
+      <div style={{ width: 240 }}>
         <button onClick={() => navigate({ name: 'home' })}>← Daftar Acara</button>
+        <FieldProperties event={event} selected={selected}
+          onField={patchField} onEvent={patchEvent} onDelete={deleteField} />
       </div>
     </div>
   );
