@@ -15,7 +15,7 @@ export interface Field {
   x: number;        // natural-pixel anchor X
   y: number;        // natural-pixel baseline Y from top
   lebar: number;    // natural-pixel width of the text box
-  font: string;     // 'Helvetica' | 'Times' | 'Courier'
+  font: 'Helvetica' | 'Times' | 'Courier';
   ukuran: number;   // font size in natural pixels
   warna: string;    // hex, e.g. '#000000'
   perataan: Perataan;

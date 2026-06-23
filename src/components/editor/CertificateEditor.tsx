@@ -43,8 +43,10 @@ export function CertificateEditor({ eventId }: { eventId: string }) {
   };
 
   const selected = event.fields.find(f => f.id === selectedId);
-  const patchField = (patch: Partial<Field>) =>
-    selected && update({ ...event, fields: event.fields.map(f => f.id === selected.id ? { ...f, ...patch } : f) });
+  const patchField = (patch: Partial<Field>) => {
+    if (!selected) return;
+    update({ ...event, fields: event.fields.map(f => f.id === selected.id ? { ...f, ...patch } : f) });
+  };
   const patchEvent = (patch: Partial<CertEvent>) => update({ ...event, ...patch });
   const deleteField = () => {
     if (!selected) return;

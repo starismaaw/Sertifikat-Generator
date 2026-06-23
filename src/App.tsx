@@ -8,7 +8,7 @@ export default function App() {
     <main style={{ fontFamily: 'system-ui', padding: 16 }}>
       <h1>Generator Sertifikat</h1>
       {view.name === 'home' && <EventList />}
-      {view.name === 'editor' && <CertificateEditor eventId={view.eventId} />}
+      {view.name === 'editor' && <CertificateEditor key={view.eventId} eventId={view.eventId} />}
       {view.name === 'generate' && <p>View: {view.name} (akan diisi di task berikutnya)</p>}
     </main>
   );

@@ -1,6 +1,11 @@
 import type { CertEvent, Field, Perataan } from '../../types';
 
-const FONTS = ['Helvetica', 'Times', 'Courier'];
+const FONTS: Field['font'][] = ['Helvetica', 'Times', 'Courier'];
+
+function safeNum(val: string, fallback: number): number {
+  const n = Number(val);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
 const ALIGNS: Perataan[] = ['left', 'center', 'right'];
 
 export function FieldProperties({
@@ -23,9 +28,9 @@ export function FieldProperties({
         <input value={event.polaNomor} onChange={e => onEvent({ polaNomor: e.target.value })} /></label>
       <small> — {'{n}'} {'{bulan}'} {'{tahun}'}</small><br />
       <label>Nomor mulai <input type="number" style={{ width: 60 }} value={event.nomorMulai}
-        onChange={e => onEvent({ nomorMulai: Number(e.target.value) })} /></label>{' '}
+        onChange={e => onEvent({ nomorMulai: safeNum(e.target.value, event.nomorMulai) })} /></label>{' '}
       <label>Padding <input type="number" style={{ width: 50 }} value={event.nomorPadding}
-        onChange={e => onEvent({ nomorPadding: Number(e.target.value) })} /></label><br />
+        onChange={e => onEvent({ nomorPadding: safeNum(e.target.value, event.nomorPadding) })} /></label><br />
       <label>Penandatangan (nama)<br />
         <input value={event.penandatangan.nama}
           onChange={e => onEvent({ penandatangan: { ...event.penandatangan, nama: e.target.value } })} /></label><br />
@@ -38,15 +43,15 @@ export function FieldProperties({
       {selected && (
         <>
           <label>Font{' '}
-            <select value={selected.font} onChange={e => onField({ font: e.target.value })}>
+            <select value={selected.font} onChange={e => onField({ font: e.target.value as Field['font'] })}>
               {FONTS.map(f => <option key={f}>{f}</option>)}
             </select></label><br />
           <label>Ukuran <input type="number" style={{ width: 60 }} value={selected.ukuran}
-            onChange={e => onField({ ukuran: Number(e.target.value) })} /></label><br />
+            onChange={e => onField({ ukuran: safeNum(e.target.value, selected.ukuran) })} /></label><br />
           <label>Warna <input type="color" value={selected.warna}
             onChange={e => onField({ warna: e.target.value })} /></label><br />
           <label>Lebar <input type="number" style={{ width: 70 }} value={Math.round(selected.lebar)}
-            onChange={e => onField({ lebar: Number(e.target.value) })} /></label><br />
+            onChange={e => onField({ lebar: safeNum(e.target.value, selected.lebar) })} /></label><br />
           <label>Perataan{' '}
             <select value={selected.perataan} onChange={e => onField({ perataan: e.target.value as Perataan })}>
               {ALIGNS.map(a => <option key={a}>{a}</option>)}
