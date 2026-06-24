@@ -5,7 +5,7 @@ import { resolveValues } from '../../lib/resolveValues';
 import { renderCertificate } from '../../lib/pdfRenderer';
 import { downloadBlob } from '../../lib/download';
 
-export function GenerateSingle({ event }: { event: CertEvent }) {
+export function GenerateSingle({ event, onGenerate }: { event: CertEvent; onGenerate?: (updated: CertEvent) => void }) {
   const [nama, setNama] = useState('');
   const [peran, setPeran] = useState('Peserta');
   const [busy, setBusy] = useState(false);
@@ -24,6 +24,7 @@ export function GenerateSingle({ event }: { event: CertEvent }) {
       const bytes = await renderCertificate(liveEvent, values);
       claimNextNumber(liveEvent.id);
       downloadBlob(bytes, `Sertifikat - ${trimmedNama}.pdf`);
+      onGenerate?.(getEvent(liveEvent.id) ?? liveEvent);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {

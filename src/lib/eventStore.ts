@@ -41,6 +41,16 @@ export function deleteEvent(id: string): void {
   writeAll(readAll().filter(e => e.id !== id));
 }
 
+/** Reset counter sehingga sertifikat berikutnya mulai dari nomorBaru. */
+export function resetCounter(id: string, nomorBaru: number): CertEvent {
+  const all = readAll();
+  const ev = all.find(e => e.id === id);
+  if (!ev) throw new Error(`Event tidak ditemukan: ${id}`);
+  ev.nomorTerakhir = nomorBaru - 1;
+  writeAll(all);
+  return { ...ev };
+}
+
 /** Atomically claim and persist the next certificate number for an event. */
 export function claimNextNumber(id: string): number {
   const all = readAll();

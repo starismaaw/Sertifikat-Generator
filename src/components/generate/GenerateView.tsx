@@ -4,9 +4,11 @@ import { navigate } from '../AppRouter';
 import { Reveal } from '../Reveal';
 import { GenerateSingle } from './GenerateSingle';
 import { GenerateBulk } from './GenerateBulk';
+import { NomorCounter } from './NomorCounter';
+import type { CertEvent } from '../../types';
 
 export function GenerateView({ eventId }: { eventId: string }) {
-  const event = getEvent(eventId);
+  const [event, setEvent] = useState<CertEvent | undefined>(() => getEvent(eventId));
   const [tab, setTab] = useState<'single' | 'bulk'>('single');
   if (!event) return (
     <Reveal>
@@ -38,6 +40,7 @@ export function GenerateView({ eventId }: { eventId: string }) {
         <div className="apple-mb-lg">
           <span className="apple-eyebrow">Generate</span>
           <h2 className="apple-h1">{event.nama}</h2>
+          <NomorCounter event={event} onReset={setEvent} />
         </div>
       </Reveal>
       <Reveal delay={2}>
@@ -49,8 +52,8 @@ export function GenerateView({ eventId }: { eventId: string }) {
         </div>
       </Reveal>
       <Reveal delay={3}>
-        {tab === 'single' && <GenerateSingle event={event} />}
-        {tab === 'bulk' && <GenerateBulk event={event} />}
+        {tab === 'single' && <GenerateSingle event={event} onGenerate={setEvent} />}
+        {tab === 'bulk' && <GenerateBulk event={event} onGenerate={setEvent} />}
       </Reveal>
     </section>
   );
