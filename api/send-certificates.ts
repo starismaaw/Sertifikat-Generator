@@ -15,6 +15,14 @@ type SendResult =
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+  const internalToken = process.env.INTERNAL_API_TOKEN;
+  if (internalToken) {
+    const provided = req.headers['x-internal-token'];
+    if (provided !== internalToken) {
+      return res.status(401).json({ error: 'Tidak diizinkan' });
+    }
+  }
+
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM;
   if (!apiKey || !from) return res.status(500).json({ error: 'Email belum dikonfigurasi di server' });
@@ -42,7 +50,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         to: r.email,
         subject: r.subject,
         text: r.body,
-        attachments: [{ filename: r.filename, content: r.pdfBase64 }],
+        attachments: [{ filename: r.filename, content: r.pdfBase64, contentType: 'application/pdf' }],
       })),
     );
 

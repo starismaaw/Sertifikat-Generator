@@ -47,6 +47,9 @@ Fitur kirim sertifikat via email membutuhkan dua variabel lingkungan di Vercel
 - `RESEND_API_KEY` — API key dari https://resend.com
 - `RESEND_FROM` — alamat pengirim pada domain yang sudah diverifikasi di Resend,
   mis. `noreply@<domain-balai>.go.id`
+- `INTERNAL_API_TOKEN` *(opsional)* — shared secret untuk melindungi endpoint
+  `/api/send-certificates` di production. Jika di-set, setiap request harus
+  menyertakan header `X-Internal-Token: <nilai>`. Biarkan kosong di dev lokal.
 
 ### Uji Lokal | Local Testing
 

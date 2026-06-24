@@ -31,7 +31,7 @@ const ENDPOINT = '/api/send-certificates';
 /** Uint8Array -> base64 tanpa meledakkan stack untuk PDF besar. */
 export function bytesToBase64(bytes: Uint8Array): string {
   let binary = '';
-  const chunk = 0x8000;
+  const chunk = 0x1000;
   for (let i = 0; i < bytes.length; i += chunk) {
     binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
   }
@@ -81,12 +81,12 @@ export async function sendCertificates(
       const data = (await res.json()) as SendSummary;
       summary.sent.push(...data.sent);
       summary.failed.push(...data.failed);
+      done += batch.length;
+      onProgress?.(done, payload.recipients.length);
     } catch (e) {
       const error = e instanceof Error ? e.message : String(e);
       for (const r of batch) summary.failed.push({ status: 'failed', email: r.email, error });
     }
-    done += batch.length;
-    onProgress?.(done, payload.recipients.length);
   }
 
   return summary;

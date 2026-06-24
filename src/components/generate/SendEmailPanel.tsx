@@ -46,7 +46,7 @@ export function SendEmailPanel({
   // Status valid di-derive saat render (rerender-derived-state), bukan via useEffect.
   const rows = useMemo<PanelRow[]>(() =>
     certificates.map(cert => {
-      const o = overrides[cert.email];
+      const o = overrides[cert.filename];
       if (o) return { cert, status: o.status, error: o.error };
       return { cert, status: isValidEmail(cert.email) ? 'valid' : 'invalid-email' };
     }), [certificates, overrides]);
@@ -59,9 +59,12 @@ export function SendEmailPanel({
     setProgress({ done: 0, total: sendable.length });
     setOverrides(prev => {
       const next = { ...prev };
-      for (const r of sendable) next[r.cert.email] = { status: 'sending' };
+      for (const r of sendable) next[r.cert.filename] = { status: 'sending' };
       return next;
     });
+
+    // Map email -> filename untuk lookup hasil (SendResult hanya membawa email).
+    const emailToFilename = new Map(sendable.map(r => [r.cert.email, r.cert.filename]));
 
     const result = await sendCertificates(
       { subject, body, recipients: sendable.map(r => r.cert) },
@@ -70,9 +73,15 @@ export function SendEmailPanel({
 
     setOverrides(prev => {
       const next = { ...prev };
-      for (const s of result.sent) next[s.email] = { status: 'sent' };
+      for (const s of result.sent) {
+        const key = emailToFilename.get(s.email) ?? s.email;
+        next[key] = { status: 'sent' };
+      }
       for (const f of result.failed) {
-        if (f.status === 'failed') next[f.email] = { status: 'failed', error: f.error };
+        if (f.status === 'failed') {
+          const key = emailToFilename.get(f.email) ?? f.email;
+          next[key] = { status: 'failed', error: f.error };
+        }
       }
       return next;
     });
@@ -119,8 +128,8 @@ function RecipientTable() {
     <table className="apple-table apple-mt-sm">
       <thead><tr><th>Nama</th><th>Email</th><th>Status</th></tr></thead>
       <tbody>
-        {rows.map(r => (
-          <tr key={r.cert.email + r.cert.nama}>
+        {rows.map((r, i) => (
+          <tr key={i}>
             <td>{r.cert.nama}</td>
             <td>{r.cert.email || <span className="apple-fine">—</span>}</td>
             <td>{STATUS_LABEL[r.status]}{r.error ? ` · ${r.error}` : ''}</td>
