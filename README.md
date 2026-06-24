@@ -56,7 +56,7 @@ Set variabel berikut di Vercel (Project Settings → Environment Variables) — 
 2. Resend akan menampilkan 3 DNS record yang perlu ditambahkan
 3. Buka panel **Kelola DNS** di idwebhost, tambahkan:
    - **SPF (txt)** — Nama Host: `@` — Nilai: `v=spf1 include:amazonses.com ~all`
-   - **CNAME** — Nama Host: `resend._domainkey` — Nilai: *(dari Resend dashboard)*
+   - **SPF (txt)** — Nama Host: `resend._domainkey` — Nilai: *(dari Resend dashboard, format TXT)*
    - **SPF (txt)** — Nama Host: `_dmarc` — Nilai: `v=DMARC1; p=none`
 4. Kembali ke Resend dashboard → klik **Verify** — tunggu propagasi DNS (1–24 jam)
 5. Setelah verified, set `SENDER_EMAIL` di Vercel ke `noreply@domain-anda.id`
