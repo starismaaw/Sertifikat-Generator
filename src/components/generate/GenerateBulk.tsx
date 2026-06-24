@@ -8,6 +8,8 @@ import { renderCertificate } from '../../lib/pdfRenderer';
 import { buildZip, downloadBlob } from '../../lib/download';
 import { ColumnMapper } from './ColumnMapper';
 import { BulkPreviewTable } from './BulkPreviewTable';
+import { SendEmailPanel } from './SendEmailPanel';
+import type { OutgoingCertificate } from '../../lib/emailSender';
 
 type Phase = 'idle' | 'generating' | 'compressing' | 'complete';
 
@@ -21,6 +23,8 @@ export function GenerateBulk({ event }: { event: CertEvent }) {
   const [phase, setPhase] = useState<Phase>('idle');
   const [currentName, setCurrentName] = useState('');
   const [done, setDone] = useState(0);
+  const [emailColumn, setEmailColumn] = useState('');
+  const [certificates, setCertificates] = useState<OutgoingCertificate[]>([]);
   const panelRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(true);
 
@@ -29,7 +33,6 @@ export function GenerateBulk({ event }: { event: CertEvent }) {
   }, []);
 
   const validCount = useMemo(() => rows.filter(r => r.valid).length, [rows]);
-  const validRows = useMemo(() => rows.filter(r => r.valid), [rows]);
 
   const previewNumbers = useMemo(() => {
     let seq = Math.max(event.nomorTerakhir + 1, event.nomorMulai);
@@ -69,14 +72,33 @@ export function GenerateBulk({ event }: { event: CertEvent }) {
 
     try {
       // Phase 1: Generate all PDFs
-      for (const r of validRows) {
+      const outgoing: OutgoingCertificate[] = [];
+      for (let i = 0; i < rows.length; i++) {
         if (!mountedRef.current) return;
+        const r = rows[i];
+        if (!r.valid) continue;
         const nama = r.values.nama ?? '';
         setCurrentName(nama);
         const n = claimNextNumber(event.id);
         const values = resolveValues(event, r.values, n);
         const bytes = await renderCertificate(event, values);
-        files.push({ name: `Sertifikat - ${String(n).padStart(event.nomorPadding, '0')} - ${nama}.pdf`, bytes });
+        const numStr = String(n).padStart(event.nomorPadding, '0');
+        const filename = `Sertifikat - ${numStr} - ${nama}.pdf`;
+        const nomorRapi = buildCertNumber(event.polaNomor, n, event.nomorPadding, new Date(event.tanggal));
+        files.push({ name: filename, bytes });
+        outgoing.push({
+          nama,
+          email: (emailColumn ? raw[i]?.[emailColumn] ?? '' : '').trim(),
+          filename,
+          pdfBytes: bytes,
+          vars: {
+            nama,
+            nomor: nomorRapi,
+            acara: event.nama,
+            tanggal: event.tanggal,
+            peran: r.values.peran ?? '',
+          },
+        });
         idx++;
         setDone(idx);
         setProgress(Math.round((idx / validCount) * 100));
@@ -99,6 +121,7 @@ export function GenerateBulk({ event }: { event: CertEvent }) {
       await new Promise(r => setTimeout(r, 400)); // let download init
 
       if (mountedRef.current) {
+        setCertificates(outgoing);
         setPhase('idle');
         setProgress(0);
         setDone(0);
@@ -143,7 +166,13 @@ export function GenerateBulk({ event }: { event: CertEvent }) {
       {error && <div className="apple-error">{error}</div>}
       {headers.length > 0 && (
         <>
-          <ColumnMapper headers={headers} mapping={mapping} onChange={remap} />
+          <ColumnMapper
+            headers={headers}
+            mapping={mapping}
+            onChange={remap}
+            emailColumn={emailColumn}
+            onEmailChange={setEmailColumn}
+          />
           <div className="apple-flex-row apple-mb-sm">
             <span className="apple-caption">{validCount} valid</span>
             <span className="apple-caption">·</span>
@@ -197,6 +226,14 @@ export function GenerateBulk({ event }: { event: CertEvent }) {
               </div>
             )}
           </div>
+          {certificates.length > 0 && (
+            <SendEmailPanel eventId={event.id} certificates={certificates}>
+              <h4 className="apple-h4 apple-mb-sm">Kirim via Email</h4>
+              <SendEmailPanel.TemplateEditor />
+              <SendEmailPanel.RecipientTable />
+              <SendEmailPanel.SendButton />
+            </SendEmailPanel>
+          )}
         </>
       )}
     </div>

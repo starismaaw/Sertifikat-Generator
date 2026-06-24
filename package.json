@@ -11,25 +11,28 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "jszip": "^3.10.1",
+    "konva": "^9.2.0",
+    "nodemailer": "^9.0.1",
+    "papaparse": "^5.4.1",
+    "pdf-lib": "^1.17.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "pdf-lib": "^1.17.1",
-    "konva": "^9.2.0",
     "react-konva": "^18.2.10",
-    "xlsx": "^0.18.5",
-    "papaparse": "^5.4.1",
-    "jszip": "^3.10.1"
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.1.5",
+    "@testing-library/react": "^14.1.2",
+    "@types/nodemailer": "^8.0.1",
+    "@types/papaparse": "^5.3.14",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
+    "@vercel/node": "^5.8.19",
     "@vitejs/plugin-react": "^4.3.0",
+    "jsdom": "^23.0.1",
     "typescript": "^5.2.2",
     "vite": "^5.0.8",
-    "vitest": "^1.0.4",
-    "jsdom": "^23.0.1",
-    "@testing-library/react": "^14.1.2",
-    "@testing-library/jest-dom": "^6.1.5",
-    "@types/papaparse": "^5.3.14"
+    "vitest": "^1.0.4"
   }
 }
