@@ -19,6 +19,7 @@ export interface Field {
   ukuran: number;   // font size in natural pixels
   warna: string;    // hex, e.g. '#000000'
   perataan: Perataan;
+  formatter: 'none' | 'uppercase';
 }
 
 export interface Penandatangan {

@@ -14,6 +14,7 @@ function newField(tipe: FieldTipe, ev: CertEvent): Field {
     x: ev.bgWidth * 0.2, y: ev.bgHeight * 0.5, lebar: ev.bgWidth * 0.6,
     font: 'Helvetica', ukuran: Math.round(ev.bgHeight * 0.04),
     warna: '#000000', perataan: 'center',
+    formatter: 'none',
   };
 }
 

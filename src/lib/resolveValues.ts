@@ -10,6 +10,11 @@ export function resolveValues(
   person: FieldValues,
   claimedNumber: number,
 ): FieldValues {
+  const namaField = event.fields.find(f => f.tipe === 'nama');
+  const formattedNama = (namaField?.formatter === 'uppercase' && person.nama)
+    ? person.nama.toUpperCase()
+    : person.nama;
+
   return {
     acara: event.nama,
     tanggal: event.tanggal,
@@ -21,6 +26,7 @@ export function resolveValues(
       event.nomorPadding,
       new Date(event.tanggal),
     ),
-    ...person, // person values (nama, peran) override
+    ...person,
+    nama: formattedNama,
   };
 }
