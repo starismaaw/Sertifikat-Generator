@@ -69,6 +69,7 @@ export function GenerateBulk({ event, onGenerate }: { event: CertEvent; onGenera
 
     const files: { name: string; bytes: Uint8Array }[] = [];
     let idx = 0;
+    const yield_ = () => new Promise<void>(r => setTimeout(r, 0));
 
     try {
       // Phase 1: Generate all PDFs
@@ -102,6 +103,7 @@ export function GenerateBulk({ event, onGenerate }: { event: CertEvent; onGenera
         idx++;
         setDone(idx);
         setProgress(Math.round((idx / validCount) * 100));
+        await yield_();
       }
 
       // Phase 2: Compress ZIP
