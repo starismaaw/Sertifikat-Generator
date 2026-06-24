@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import type { CertEvent, FieldTipe } from '../../types';
 import { parseFile, applyMapping, validateRows, type ValidatedRow } from '../../lib/dataImporter';
 import { buildCertNumber } from '../../lib/numberFormatter';
-import { claimNextNumber } from '../../lib/eventStore';
+import { claimNextNumber, getEvent } from '../../lib/eventStore';
 import { resolveValues } from '../../lib/resolveValues';
 import { renderCertificate } from '../../lib/pdfRenderer';
 import { buildZip, downloadBlob } from '../../lib/download';
@@ -13,7 +13,7 @@ import type { OutgoingCertificate } from '../../lib/emailSender';
 
 type Phase = 'idle' | 'generating' | 'compressing' | 'complete';
 
-export function GenerateBulk({ event }: { event: CertEvent }) {
+export function GenerateBulk({ event, onGenerate }: { event: CertEvent; onGenerate?: (updated: CertEvent) => void }) {
   const [headers, setHeaders] = useState<string[]>([]);
   const [mapping, setMapping] = useState<Partial<Record<FieldTipe, string>>>({});
   const [raw, setRaw] = useState<Record<string, string>[]>([]);
@@ -122,6 +122,8 @@ export function GenerateBulk({ event }: { event: CertEvent }) {
 
       if (mountedRef.current) {
         setCertificates(outgoing);
+        const updated = getEvent(event.id);
+        if (updated) onGenerate?.(updated);
         setPhase('idle');
         setProgress(0);
         setDone(0);
