@@ -25,8 +25,19 @@ export type SendResult =
 
 export interface SendSummary { sent: SendResult[]; failed: SendResult[]; }
 
-const BATCH_SIZE = 8;
 const ENDPOINT = '/api/send-certificates';
+
+// Konservatif vs limit Vercel 4.5MB — memperhitungkan overhead base64 dan envelope JSON.
+const VERCEL_BODY_LIMIT_BYTES = 3.5 * 1024 * 1024;
+
+/** Hitung max penerima per batch agar payload tidak melampaui body limit Vercel. */
+export function maxBatchSize(recipients: OutgoingCertificate[]): number {
+  if (recipients.length === 0) return 1;
+  const maxPdfBytes = Math.max(...recipients.map(r => r.pdfBytes.length));
+  // Base64 encode 3 byte menjadi 4 karakter; tambah ~2KB per penerima untuk field JSON.
+  const bytesPerRecipient = Math.ceil(maxPdfBytes * (4 / 3)) + 2048;
+  return Math.max(1, Math.floor(VERCEL_BODY_LIMIT_BYTES / bytesPerRecipient));
+}
 
 /** Uint8Array -> base64 tanpa meledakkan stack untuk PDF besar. */
 export function bytesToBase64(bytes: Uint8Array): string {
@@ -59,7 +70,7 @@ export async function sendCertificates(
   onProgress?: (done: number, total: number) => void,
 ): Promise<SendSummary> {
   const summary: SendSummary = { sent: [], failed: [] };
-  const batches = chunk(payload.recipients, BATCH_SIZE);
+  const batches = chunk(payload.recipients, maxBatchSize(payload.recipients));
   let done = 0;
 
   for (const batch of batches) {
