@@ -39,19 +39,27 @@ Key features:
 npm install
 ```
 
-## Pengiriman Email | Email Delivery (Gmail + Vercel)
+## Pengiriman Email | Email Delivery (Resend + Custom Domain)
 
-Fitur kirim sertifikat via email menggunakan Gmail SMTP. Set variabel berikut di Vercel
-(Project Settings → Environment Variables) — JANGAN commit ke repo:
+Fitur kirim sertifikat via email menggunakan [Resend](https://resend.com).
+Set variabel berikut di Vercel (Project Settings → Environment Variables) — JANGAN commit ke repo:
 
-- `GMAIL_USER` — alamat Gmail pengirim, mis. `namakamu@gmail.com`
-- `GMAIL_APP_PASSWORD` — App Password 16 karakter (bukan password Gmail biasa).
-  Cara membuat: Google Account → Security → 2-Step Verification → App Passwords
+- `RESEND_API_KEY` — API key dari resend.com/api-keys
+- `SENDER_EMAIL` — alamat pengirim terverifikasi, mis. `noreply@instansi.web.id`
 - `INTERNAL_API_TOKEN` *(opsional)* — shared secret untuk melindungi endpoint
   `/api/send-certificates` di production. Jika di-set, setiap request harus
   menyertakan header `X-Internal-Token: <nilai>`. Biarkan kosong di dev lokal.
 
-> **Syarat:** Aktifkan 2-Factor Authentication di akun Gmail sebelum bisa membuat App Password.
+### Setup Domain di Resend
+
+1. Buka [resend.com/domains](https://resend.com/domains) → Add Domain → masukkan domain Anda
+2. Resend akan menampilkan 3 DNS record yang perlu ditambahkan
+3. Buka panel **Kelola DNS** di idwebhost, tambahkan:
+   - **SPF (txt)** — Nama Host: `@` — Nilai: `v=spf1 include:amazonses.com ~all`
+   - **SPF (txt)** — Nama Host: `resend._domainkey` — Nilai: *(dari Resend dashboard, format TXT)*
+   - **SPF (txt)** — Nama Host: `_dmarc` — Nilai: `v=DMARC1; p=none`
+4. Kembali ke Resend dashboard → klik **Verify** — tunggu propagasi DNS (1–24 jam)
+5. Setelah verified, set `SENDER_EMAIL` di Vercel ke `noreply@domain-anda.id`
 
 ### Uji Lokal | Local Testing
 
@@ -62,11 +70,7 @@ npm i -g vercel
 vercel dev
 ```
 
-Buat file `.env.local` (sudah di-ignore git) berisi `GMAIL_USER` dan
-`GMAIL_APP_PASSWORD` untuk pengujian lokal.
-
-Create a `.env.local` file (already git-ignored) containing `GMAIL_USER` and
-`GMAIL_APP_PASSWORD` for local testing.
+Buat file `.env.local` (sudah di-ignore git) berisi `RESEND_API_KEY` dan `SENDER_EMAIL`.
 
 ---
 
