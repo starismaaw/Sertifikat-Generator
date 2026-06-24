@@ -76,7 +76,7 @@ describe('send-certificates handler', () => {
     expect(res.statusCode).toBe(500);
   });
 
-  // WHY: payload com mais de 100 penerima harus ditolak sebelum memanggil Resend (early-exit).
+  // WHY: payload lebih dari 100 penerima harus ditolak sebelum memanggil Resend (early-exit).
   it('menolak recipients melebihi MAX_RECIPIENTS (100)', async () => {
     const res = mockRes();
     const tooMany = Array.from({ length: 101 }, (_, i) => ({
