@@ -180,9 +180,6 @@ After completing work:
 3. Wait for user approval
 4. Only then commit and push
 
-## Design System
-DESIGN.md
-
 ### Post-Merge / Squash-Merge Branch Rules
 
 After a branch has been merged into `main`, especially through a squash merge, treat that branch as finished by default.
