@@ -39,17 +39,19 @@ Key features:
 npm install
 ```
 
-## Pengiriman Email | Email Delivery (Resend + Vercel)
+## Pengiriman Email | Email Delivery (Gmail + Vercel)
 
-Fitur kirim sertifikat via email membutuhkan dua variabel lingkungan di Vercel
+Fitur kirim sertifikat via email menggunakan Gmail SMTP. Set variabel berikut di Vercel
 (Project Settings → Environment Variables) — JANGAN commit ke repo:
 
-- `RESEND_API_KEY` — API key dari https://resend.com
-- `RESEND_FROM` — alamat pengirim pada domain yang sudah diverifikasi di Resend,
-  mis. `noreply@<domain-balai>.go.id`
+- `GMAIL_USER` — alamat Gmail pengirim, mis. `namakamu@gmail.com`
+- `GMAIL_APP_PASSWORD` — App Password 16 karakter (bukan password Gmail biasa).
+  Cara membuat: Google Account → Security → 2-Step Verification → App Passwords
 - `INTERNAL_API_TOKEN` *(opsional)* — shared secret untuk melindungi endpoint
   `/api/send-certificates` di production. Jika di-set, setiap request harus
   menyertakan header `X-Internal-Token: <nilai>`. Biarkan kosong di dev lokal.
+
+> **Syarat:** Aktifkan 2-Factor Authentication di akun Gmail sebelum bisa membuat App Password.
 
 ### Uji Lokal | Local Testing
 
@@ -60,11 +62,11 @@ npm i -g vercel
 vercel dev
 ```
 
-Buat file `.env.local` (sudah di-ignore git) berisi `RESEND_API_KEY` dan
-`RESEND_FROM` untuk pengujian lokal.
+Buat file `.env.local` (sudah di-ignore git) berisi `GMAIL_USER` dan
+`GMAIL_APP_PASSWORD` untuk pengujian lokal.
 
-Create a `.env.local` file (already git-ignored) containing `RESEND_API_KEY` and
-`RESEND_FROM` for local testing.
+Create a `.env.local` file (already git-ignored) containing `GMAIL_USER` and
+`GMAIL_APP_PASSWORD` for local testing.
 
 ---
 

@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { Resend } from 'resend';
+import nodemailer from 'nodemailer';
 
-const MAX_RECIPIENTS = 100; // batas aman per request
+const MAX_RECIPIENTS = 100;
 
 // Subjek & badan SUDAH diinterpolasi per penerima oleh klien.
 interface WireRecipient {
@@ -23,9 +23,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.RESEND_FROM;
-  if (!apiKey || !from) return res.status(500).json({ error: 'Email belum dikonfigurasi di server' });
+  const gmailUser = process.env.GMAIL_USER;
+  const gmailPass = process.env.GMAIL_APP_PASSWORD;
+  if (!gmailUser || !gmailPass) {
+    return res.status(500).json({ error: 'Email belum dikonfigurasi di server' });
+  }
 
   const { recipients } = (req.body ?? {}) as { recipients?: WireRecipient[] };
 
@@ -39,35 +41,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'Setiap penerima wajib punya email, subject, dan body' });
   }
 
-  const resend = new Resend(apiKey);
+  const transporter = nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false,
+    auth: { user: gmailUser, pass: gmailPass },
+  });
+
   const sent: SendResult[] = [];
   const failed: SendResult[] = [];
 
-  try {
-    const { data, error } = await resend.batch.send(
-      recipients.map(r => ({
-        from,
+  // Kirim per-penerima secara berurutan — Gmail SMTP tidak mendukung batch sejati.
+  for (const r of recipients) {
+    try {
+      const info = await transporter.sendMail({
+        from: gmailUser,
         to: r.email,
         subject: r.subject,
         text: r.body,
-        attachments: [{ filename: r.filename, content: r.pdfBase64, contentType: 'application/pdf' }],
-      })),
-    );
-
-    if (error || !data) {
-      const message = error?.message ?? 'Pengiriman gagal';
-      for (const r of recipients) failed.push({ status: 'failed', email: r.email, error: message });
-    } else {
-      // data.data berisi id per email, urutannya sama dengan input.
-      recipients.forEach((r, i) => {
-        const id = (data as { data: Array<{ id: string }> }).data[i]?.id;
-        if (id) sent.push({ status: 'sent', email: r.email, id });
-        else failed.push({ status: 'failed', email: r.email, error: 'Tidak ada id balasan' });
+        attachments: [{
+          filename: r.filename,
+          content: Buffer.from(r.pdfBase64, 'base64'),
+          contentType: 'application/pdf',
+        }],
       });
+      sent.push({ status: 'sent', email: r.email, id: info.messageId });
+    } catch (e) {
+      const error = e instanceof Error ? e.message : 'Kesalahan tidak dikenal';
+      failed.push({ status: 'failed', email: r.email, error });
     }
-  } catch (e) {
-    const message = e instanceof Error ? e.message : 'Kesalahan tidak dikenal';
-    for (const r of recipients) failed.push({ status: 'failed', email: r.email, error: message });
   }
 
   return res.status(200).json({ sent, failed });
