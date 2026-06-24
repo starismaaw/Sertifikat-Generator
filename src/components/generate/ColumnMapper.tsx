@@ -4,11 +4,13 @@ import { FIELD_LABELS } from '../editor/FieldPalette';
 const MAPPABLE: FieldTipe[] = ['nama', 'peran'];
 
 export function ColumnMapper({
-  headers, mapping, onChange,
+  headers, mapping, onChange, emailColumn, onEmailChange,
 }: {
   headers: string[];
   mapping: Partial<Record<FieldTipe, string>>;
   onChange: (m: Partial<Record<FieldTipe, string>>) => void;
+  emailColumn: string;
+  onEmailChange: (col: string) => void;
 }) {
   return (
     <div className="apple-flex-row apple-gap-md apple-mb-md">
@@ -25,6 +27,16 @@ export function ColumnMapper({
           </select>
         </div>
       ))}
+      <div className="apple-form-group" style={{ marginBottom: 0 }}>
+        <label className="apple-label" style={{ marginBottom: 3, fontSize: 12 }}>
+          Email <span className="apple-fine">(untuk pengiriman)</span>
+        </label>
+        <select className="apple-select" value={emailColumn}
+          onChange={e => onEmailChange(e.target.value)}>
+          <option value="">— pilih kolom —</option>
+          {headers.map(h => <option key={h} value={h}>{h}</option>)}
+        </select>
+      </div>
     </div>
   );
 }
