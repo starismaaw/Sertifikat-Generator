@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
 const MAX_RECIPIENTS = 100;
 
@@ -23,9 +23,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  const gmailUser = process.env.GMAIL_USER;
-  const gmailPass = process.env.GMAIL_APP_PASSWORD;
-  if (!gmailUser || !gmailPass) {
+  const apiKey = process.env.RESEND_API_KEY;
+  const senderEmail = process.env.SENDER_EMAIL;
+  if (!apiKey || !senderEmail) {
     return res.status(500).json({ error: 'Email belum dikonfigurasi di server' });
   }
 
@@ -41,31 +41,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'Setiap penerima wajib punya email, subject, dan body' });
   }
 
-  const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,
-    auth: { user: gmailUser, pass: gmailPass },
-  });
-
+  const resend = new Resend(apiKey);
   const sent: SendResult[] = [];
   const failed: SendResult[] = [];
 
-  // Kirim per-penerima secara berurutan — Gmail SMTP tidak mendukung batch sejati.
   for (const r of recipients) {
     try {
-      const info = await transporter.sendMail({
-        from: gmailUser,
+      const { data, error } = await resend.emails.send({
+        from: senderEmail,
         to: r.email,
         subject: r.subject,
         text: r.body,
         attachments: [{
           filename: r.filename,
           content: Buffer.from(r.pdfBase64, 'base64'),
-          contentType: 'application/pdf',
         }],
       });
-      sent.push({ status: 'sent', email: r.email, id: info.messageId });
+      if (error || !data) {
+        throw new Error(error?.message ?? 'Resend tidak mengembalikan data');
+      }
+      sent.push({ status: 'sent', email: r.email, id: data.id });
     } catch (e) {
       const error = e instanceof Error ? e.message : 'Kesalahan tidak dikenal';
       failed.push({ status: 'failed', email: r.email, error });
