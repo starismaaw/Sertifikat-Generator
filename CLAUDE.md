@@ -112,3 +112,204 @@ Default to surfacing uncertainty, not hiding it.
 - **Minimal Impact**: Changes should only touch what's necessary. Avoid introducing bugs.
 
 ---
+
+# Agent Instructions (Claude Code / Codex / CommandCode)
+
+This file is the canonical instruction file for all coding agents on this project.
+
+Canonical repository: https://github.com/starismaaw/Sertifikat-Generator/
+
+GitHub is the source of truth. Do not rely on prior agent memory as project state.
+
+## Automatic Start Protocol
+
+At the beginning of every session, before editing files, automatically run:
+
+```bash
+git status
+git branch --show-current
+git log --oneline -10
+git fetch origin
+```
+
+Then read:
+
+```text
+AGENTS.md
+docs/agent-handoff.md
+```
+
+Summarize briefly:
+
+- current branch
+- working tree status
+- whether current branch is `main`, `master`, detached, or safe non-main branch
+- latest relevant handoff
+- task scope
+- whether the task is implementation mode or review-only mode
+
+Do not edit files until this context is understood.
+
+Only run `git pull` when it is safe for the current branch and there are no uncommitted changes that could be overwritten.
+
+If there are unclear local changes at session start, stop and ask before overwriting, reverting, stashing, or pulling.
+
+## Working Rules
+
+Follow `AGENTS.md` for all project rules.
+
+Important reminders:
+
+- Keep changes surgical and focused.
+- Preserve the current Bahasa Indonesia UI and formal government style.
+- Do not refactor unrelated files.
+- Do not commit secrets or `.env*` files.
+- Never expose `SUPABASE_SERVICE_ROLE_KEY` to browser/client code.
+- Do not modify Supabase production database, auth, storage, or RLS without explicit approval.
+- Do not modify Vercel deployment settings without explicit approval.
+- Do not modify auth/security-sensitive logic without explicit approval.
+- For non-trivial tasks, write a short plan first and verify after each significant step.
+
+## Branch Safety
+
+`main` is the protected production branch.
+
+Agent must not edit, commit, or push code changes directly on `main` unless the user explicitly says:
+
+```text
+You may edit main directly.
+```
+
+For any code or documentation change, create a branch first:
+
+```bash
+git fetch origin
+git switch -c feat/<short-name> origin/main
+```
+
+Use the correct branch prefix:
+
+- `feat/<short-name>` for features
+- `fix/<short-name>` for bug fixes
+- `docs/<short-name>` for documentation
+- `chore/<short-name>` for maintenance/config
+- `refactor/<short-name>` for internal refactors
+- `test/<short-name>` for tests
+
+After finishing, push the branch and ask the user before merging to `main`.
+
+## Handoff Source of Truth
+
+Each git worktree has its own copy of `docs/agent-handoff.md`. This is expected and safe.
+
+Treat the local `docs/agent-handoff.md` as valid only for the current worktree and current branch.
+
+When reviewing another agent's work, read the handoff from that agent's pushed branch, not from the internal worktree path:
+
+```bash
+git fetch origin
+git show origin/<branch-name>:docs/agent-handoff.md
+```
+
+If a handoff conflict appears during merge:
+
+1. Resolve code conflicts first.
+2. Treat `docs/agent-handoff.md` as a status snapshot, not source code.
+3. Keep only the latest relevant status for the branch being merged.
+4. If unsure, regenerate a fresh short handoff after validation.
+
+## Finish Protocol
+
+At the end of a task, follow the finish protocol from `AGENTS.md`.
+
+Run validation:
+
+```bash
+npm run build
+npm run lint
+npm run test
+git status
+```
+
+Then update:
+
+```text
+docs/agent-handoff.md
+```
+
+By default, do not commit or push.
+
+Only commit and push if the user explicitly says one of:
+
+- `commit and push`
+- `you may commit and push`
+- `push this branch`
+- `create a commit`
+- `commit this`
+- `push to GitHub`
+
+If the user explicitly approved commit/push, agent may commit and push only the current non-main branch if:
+
+- the task is complete
+- build passes
+- no blocking lint errors exist
+- changed files are relevant
+- no secrets are included
+
+Agent must never commit directly to `main` or `master`.
+
+Agent must never push to `main` or `master`.
+
+Agent must not merge to `main` without explicit approval.
+
+## Handoff Format
+
+Before agent stops work, hits limits, or user switches agent during implementation:
+
+1. Stop starting new work.
+2. Run:
+
+```bash
+git status
+npm run build
+npm run lint
+npm run test
+```
+
+3. Update:
+
+```text
+docs/agent-handoff.md
+```
+
+Use this format:
+
+```markdown
+## Agent Handoff
+
+**Branch:**
+**Task:**
+**Last agent:**
+**Status:**
+
+### Files Changed
+- ...
+
+### Commands Run
+- ...
+
+### Validation
+- Build:
+- Lint:
+- Test:
+
+### Known Issues
+- ...
+
+### Next Step
+- ...
+```
+
+Include: branch, task, what changed, files touched, commands run, build/lint/test result, known issues, exact next step, and whether changes were committed/pushed or left local.
+
+If lint reports warnings, state that honestly. Do not say "clean" unless there are zero warnings.
