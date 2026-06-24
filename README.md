@@ -39,6 +39,32 @@ Key features:
 npm install
 ```
 
+## Pengiriman Email | Email Delivery (Resend + Vercel)
+
+Fitur kirim sertifikat via email membutuhkan dua variabel lingkungan di Vercel
+(Project Settings → Environment Variables) — JANGAN commit ke repo:
+
+- `RESEND_API_KEY` — API key dari https://resend.com
+- `RESEND_FROM` — alamat pengirim pada domain yang sudah diverifikasi di Resend,
+  mis. `noreply@<domain-balai>.go.id`
+
+### Uji Lokal | Local Testing
+
+Serverless function (`/api`) tidak berjalan di `vite dev`. Untuk uji end-to-end:
+
+```bash
+npm i -g vercel
+vercel dev
+```
+
+Buat file `.env.local` (sudah di-ignore git) berisi `RESEND_API_KEY` dan
+`RESEND_FROM` untuk pengujian lokal.
+
+Create a `.env.local` file (already git-ignored) containing `RESEND_API_KEY` and
+`RESEND_FROM` for local testing.
+
+---
+
 ## Pengembangan | Development
 
 ```bash
