@@ -38,7 +38,7 @@ describe('resolveValues', () => {
     expect(result.nama).toBe('BUDI SANTOSO');
   });
 
-  // WHY: formatter none (atau undefined untuk field lama) tidak boleh mengubah nama.
+  // WHY: formatter none tidak boleh mengubah nama.
   it('tidak mengubah nama jika formatter none', () => {
     const ev = makeEvent([{ tipe: 'nama', formatter: 'none' }]);
     const result = resolveValues(ev, { nama: 'budi santoso' }, 1);

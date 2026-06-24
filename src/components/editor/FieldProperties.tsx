@@ -93,7 +93,7 @@ export function FieldProperties({
           {selected.tipe === 'nama' && (
             <div className="apple-form-group">
               <label className="apple-label">Format Teks</label>
-              <select className="apple-select" value={selected.formatter ?? 'none'}
+              <select className="apple-select" value={selected.formatter}
                 onChange={e => onField({ formatter: e.target.value as Field['formatter'] })}>
                 <option value="none">Asli</option>
                 <option value="uppercase">UPPERCASE</option>

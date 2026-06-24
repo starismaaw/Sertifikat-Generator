@@ -7,7 +7,10 @@ function readAll(): CertEvent[] {
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as CertEvent[]) : [];
+    if (!Array.isArray(parsed)) return [];
+    const events = parsed as CertEvent[];
+    events.forEach(e => e.fields.forEach(f => { if (!f.formatter) f.formatter = 'none'; }));
+    return events;
   } catch {
     return [];
   }
