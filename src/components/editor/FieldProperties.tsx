@@ -90,6 +90,16 @@ export function FieldProperties({
               {ALIGNS.map(a => <option key={a}>{a}</option>)}
             </select>
           </div>
+          {selected.tipe === 'nama' && (
+            <div className="apple-form-group">
+              <label className="apple-label">Format Teks</label>
+              <select className="apple-select" value={selected.formatter ?? 'none'}
+                onChange={e => onField({ formatter: e.target.value as Field['formatter'] })}>
+                <option value="none">Asli</option>
+                <option value="uppercase">UPPERCASE</option>
+              </select>
+            </div>
+          )}
           <button className="apple-btn apple-btn-danger apple-mt-sm" onClick={onDelete}>Hapus field</button>
         </>
       )}
