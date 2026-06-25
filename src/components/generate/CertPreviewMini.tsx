@@ -55,6 +55,7 @@ export function CertPreviewMini({
                     text={displayText}
                     x={f.x * scale}
                     y={f.y * scale}
+                    fontFamily={f.font}
                     fontSize={f.ukuran * scale}
                     fill={f.warna}
                     width={f.lebar * scale}
