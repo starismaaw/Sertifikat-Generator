@@ -13,12 +13,10 @@ export function NomorCounter({ event, onReset }: Props) {
   const [draft, setDraft] = useState(nextN);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Sync draft setiap kali nextN berubah dari luar (mis. setelah generate).
   useEffect(() => {
     if (!editing) setDraft(nextN);
   }, [nextN, editing]);
 
-  // Auto-select saat input muncul.
   useEffect(() => {
     if (editing) inputRef.current?.select();
   }, [editing]);
@@ -41,17 +39,17 @@ export function NomorCounter({ event, onReset }: Props) {
   const display = String(nextN).padStart(event.nomorPadding, '0');
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-      <span className="apple-caption">Nomor berikutnya:</span>
+    <div className="sg-nomor-counter">
+      <span className="sg-nomor-label">Nomor berikutnya</span>
       {editing ? (
         <>
           <input
             ref={inputRef}
-            className="apple-input apple-input-sm"
+            className="sg-input"
             type="number"
             min={1}
             value={draft}
-            style={{ width: 80 }}
+            style={{ width: 72, fontFamily: 'ui-monospace, monospace', fontSize: 14 }}
             onChange={e => setDraft(Number(e.target.value))}
             onKeyDown={e => {
               if (e.key === 'Enter') commit();
@@ -59,18 +57,26 @@ export function NomorCounter({ event, onReset }: Props) {
             }}
             onBlur={commit}
           />
-          <span className="apple-fine">Enter simpan · Esc batal</span>
+          <span style={{ fontSize: 11, color: 'var(--color-ink-faint)' }}>Enter · Esc batal</span>
         </>
       ) : (
         <button
-          className="apple-btn apple-btn-ghost"
-          style={{ fontWeight: 600, padding: '2px 10px', fontSize: 14 }}
+          className="sg-nomor-value"
+          style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'ui-monospace, monospace' }}
           onClick={startEdit}
           title="Klik untuk ubah nomor mulai"
         >
-          {display} ✎
+          {display}
         </button>
       )}
+      <button
+        className="sg-btn sg-btn-outline"
+        style={{ padding: '3px 10px', fontSize: 11.5, borderRadius: 6 }}
+        onClick={startEdit}
+        title="Atur ulang nomor"
+      >
+        Atur
+      </button>
     </div>
   );
 }
