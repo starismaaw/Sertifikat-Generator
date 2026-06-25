@@ -88,6 +88,7 @@ export function EditorCanvas({
                     text={FIELD_LABELS[f.tipe]}
                     x={sx}
                     y={sy}
+                    fontFamily={f.font}
                     fontSize={f.ukuran * scale}
                     fill={f.warna}
                     width={sw}
