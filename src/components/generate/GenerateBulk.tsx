@@ -9,11 +9,32 @@ import { buildZip, downloadBlob } from '../../lib/download';
 import { ColumnMapper } from './ColumnMapper';
 import { BulkPreviewTable } from './BulkPreviewTable';
 import { SendEmailPanel } from './SendEmailPanel';
+import { StepperBar, type StepDef } from './StepperBar';
 import type { OutgoingCertificate } from '../../lib/emailSender';
 
 type Phase = 'idle' | 'generating' | 'compressing' | 'complete';
 
+function UploadIcon() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="var(--color-primary)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M24 17v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-5" />
+      <polyline points="20 9 14 3 8 9" />
+      <line x1="14" y1="3" x2="14" y2="17" />
+    </svg>
+  );
+}
+
+function InfoIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--color-primary)" strokeWidth="1.4" strokeLinecap="round">
+      <circle cx="8" cy="8" r="6.5" />
+      <path d="M8 7.5v4M8 5.5v.5" />
+    </svg>
+  );
+}
+
 export function GenerateBulk({ event, onGenerate }: { event: CertEvent; onGenerate?: (updated: CertEvent) => void }) {
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [headers, setHeaders] = useState<string[]>([]);
   const [mapping, setMapping] = useState<Partial<Record<FieldTipe, string>>>({});
   const [raw, setRaw] = useState<Record<string, string>[]>([]);
@@ -25,10 +46,13 @@ export function GenerateBulk({ event, onGenerate }: { event: CertEvent; onGenera
   const [done, setDone] = useState(0);
   const [emailColumn, setEmailColumn] = useState('');
   const [certificates, setCertificates] = useState<OutgoingCertificate[]>([]);
-  const panelRef = useRef<HTMLDivElement>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const [fileName, setFileName] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const mountedRef = useRef(true);
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => { mountedRef.current = false; };
   }, []);
 
@@ -48,10 +72,12 @@ export function GenerateBulk({ event, onGenerate }: { event: CertEvent; onGenera
       if (parsed.headers.length === 0) throw new Error('File kosong atau header tidak terbaca');
       setHeaders(parsed.headers);
       setRaw(parsed.rows);
+      setFileName(file.name);
       const guess = parsed.headers.find(h => /nama/i.test(h));
       const m: Partial<Record<FieldTipe, string>> = guess ? { nama: guess } : {};
       setMapping(m);
       setRows(validateRows(applyMapping(parsed.rows, m)));
+      setStep(2);
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
   }
 
@@ -72,7 +98,6 @@ export function GenerateBulk({ event, onGenerate }: { event: CertEvent; onGenera
     const yield_ = () => new Promise<void>(r => setTimeout(r, 0));
 
     try {
-      // Phase 1: Generate all PDFs
       const outgoing: OutgoingCertificate[] = [];
       for (let i = 0; i < rows.length; i++) {
         if (!mountedRef.current) return;
@@ -92,13 +117,7 @@ export function GenerateBulk({ event, onGenerate }: { event: CertEvent; onGenera
           email: (emailColumn ? raw[i]?.[emailColumn] ?? '' : '').trim(),
           filename,
           pdfBytes: bytes,
-          vars: {
-            nama,
-            nomor: nomorRapi,
-            acara: event.nama,
-            tanggal: event.tanggal,
-            peran: r.values.peran ?? '',
-          },
+          vars: { nama, nomor: nomorRapi, acara: event.nama, tanggal: event.tanggal, peran: r.values.peran ?? '' },
         });
         idx++;
         setDone(idx);
@@ -106,21 +125,19 @@ export function GenerateBulk({ event, onGenerate }: { event: CertEvent; onGenera
         await yield_();
       }
 
-      // Phase 2: Compress ZIP
       if (!mountedRef.current) return;
       setPhase('compressing');
       setCurrentName('');
       const zip = await buildZip(files);
 
-      // Phase 3: Complete with checkmark
       if (!mountedRef.current) return;
       setPhase('complete');
       setProgress(100);
-      await new Promise(r => setTimeout(r, 700)); // show checkmark briefly
+      await new Promise(r => setTimeout(r, 700));
 
       if (!mountedRef.current) return;
       downloadBlob(zip, `Sertifikat - ${event.nama}.zip`, 'application/zip');
-      await new Promise(r => setTimeout(r, 400)); // let download init
+      await new Promise(r => setTimeout(r, 400));
 
       if (mountedRef.current) {
         setCertificates(outgoing);
@@ -129,116 +146,185 @@ export function GenerateBulk({ event, onGenerate }: { event: CertEvent; onGenera
         setPhase('idle');
         setProgress(0);
         setDone(0);
+        setStep(4);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
-      if (mountedRef.current) {
-        setPhase('idle');
-        setProgress(0);
-        setDone(0);
-      }
+      if (mountedRef.current) { setPhase('idle'); setProgress(0); setDone(0); }
     }
   }
 
-  const fillClass =
-    phase === 'complete' ? 'apple-progress-fill complete' :
-    phase === 'generating' ? 'apple-progress-fill shimmer' :
-    phase === 'compressing' ? 'apple-progress-fill indeterminate' :
-    'apple-progress-fill';
+  // Stepper configuration
+  const steps: StepDef[] = [
+    { label: 'Unggah berkas', status: step > 1 ? 'done' : step === 1 ? 'active' : 'future' },
+    { label: 'Petakan kolom', status: step > 2 ? 'done' : step === 2 ? 'active' : 'future' },
+    { label: 'Pratinjau', status: step > 3 ? 'done' : step === 3 ? 'active' : 'future' },
+    { label: 'Unduh', status: step === 4 ? 'active' : 'future' },
+  ];
 
-  const phaseLabel =
-    phase === 'generating' ? 'Membuat sertifikat' :
-    phase === 'compressing' ? 'Mengompres berkas ZIP' :
-    phase === 'complete' ? 'Siap diunduh' :
-    '';
-
-  const barWidth =
-    phase === 'compressing' ? 40 :
-    phase === 'complete' ? 100 :
-    progress;
+  const isGenerating = phase !== 'idle';
 
   return (
-    <div className="apple-card">
-      <h3 className="apple-h3 apple-mb-md">Massal</h3>
-      <div className="apple-form-group">
-        <label className="apple-label">Upload file peserta</label>
-        <input className="apple-input" type="file" accept=".csv,.xlsx,.xls"
-          onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])}
-          style={{ padding: 8, fontSize: 14 }} />
-        <span className="apple-hint">Format: CSV atau Excel (.xlsx/.xls)</span>
-      </div>
-      {error && <div className="apple-error">{error}</div>}
-      {headers.length > 0 && (
-        <>
+    <div>
+      <StepperBar steps={steps} />
+
+      {error && <div className="apple-error" style={{ marginBottom: 16 }}>{error}</div>}
+
+      {/* Step 1: Upload */}
+      {step === 1 && (
+        <div className="sg-card sg-card-pad">
+          <div
+            className={`sg-drop-zone ${dragOver ? 'drag-over' : ''}`}
+            onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={e => {
+              e.preventDefault();
+              setDragOver(false);
+              const f = e.dataTransfer.files[0];
+              if (f) handleFile(f);
+            }}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <div className="sg-drop-icon-wrap"><UploadIcon /></div>
+            <div className="sg-drop-title">Letakkan berkas di sini, atau telusuri</div>
+            <div className="sg-drop-subtitle">Mendukung format Excel (.xlsx) dan CSV · maksimal 500 baris</div>
+            <button
+              className="sg-btn sg-btn-primary sg-btn-pill"
+              onClick={e => { e.stopPropagation(); fileInputRef.current?.click(); }}
+            >
+              Pilih berkas
+            </button>
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,.xlsx,.xls"
+            hidden
+            onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])}
+          />
+          <div className="sg-info-box" style={{ marginTop: 16 }}>
+            <InfoIcon />
+            <span>Berkas sebaiknya memiliki kolom <strong>Nama</strong>, <strong>Peran</strong>, dan <strong>Email</strong> (opsional). Baris pertama dianggap sebagai judul kolom.</span>
+          </div>
+        </div>
+      )}
+
+      {/* Step 2: Map columns */}
+      {step === 2 && (
+        <div className="sg-card sg-card-pad">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-ink)' }}>Petakan kolom</h3>
+            <span style={{
+              fontSize: 11.5, fontWeight: 600, padding: '3px 10px',
+              borderRadius: 9999, background: 'rgba(26,174,57,0.1)', color: '#138a2e',
+            }}>
+              {fileName} · {raw.length} baris
+            </span>
+          </div>
+          <p style={{ fontSize: 13, color: 'var(--color-ink-muted)', marginBottom: 20 }}>
+            Cocokkan kolom dari berkas Anda dengan field sertifikat.
+          </p>
           <ColumnMapper
             headers={headers}
             mapping={mapping}
             onChange={remap}
             emailColumn={emailColumn}
             onEmailChange={setEmailColumn}
+            sampleRows={raw.slice(0, 3)}
           />
-          <div className="apple-flex-row apple-mb-sm">
-            <span className="apple-caption">{validCount} valid</span>
-            <span className="apple-caption">·</span>
-            <span className="apple-caption">{rows.length} baris</span>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+            <button className="sg-btn sg-btn-outline" onClick={() => setStep(1)}>← Kembali</button>
+            <button
+              className="sg-btn sg-btn-primary"
+              onClick={() => { if (mapping.nama) setStep(3); else setError('Kolom Nama wajib dipetakan'); }}
+            >
+              Lanjut ke pratinjau →
+            </button>
           </div>
+        </div>
+      )}
+
+      {/* Step 3: Preview & validate */}
+      {step === 3 && (
+        <div className="sg-card" style={{ overflow: 'hidden' }}>
           <BulkPreviewTable rows={rows} numbers={previewNumbers} />
-          <div className="apple-mt-md">
-            {phase === 'idle' ? (
-              <button className="apple-btn apple-btn-primary apple-btn-lg" onClick={generate}>
-                Generate & Unduh ZIP
-              </button>
-            ) : (
-              <div ref={panelRef}
-                className="apple-progress-panel enter"
-                style={{ maxHeight: 200, opacity: 1 }}>
-                <div className="apple-progress">
-                  <div className="apple-progress-header">
-                    <span className="apple-progress-phase">
-                      {phase === 'complete' ? (
-                        <span className="apple-progress-check">
-                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                            <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
-                            <path d="M5 8.5L7 10.5L11 6" stroke="currentColor" strokeWidth="1.5"
-                              strokeLinecap="round" strokeLinejoin="round"
-                              strokeDasharray="30" strokeDashoffset="0"
-                              style={{ animation: 'apple-checkmark-draw 0.4s ease forwards' }} />
-                          </svg>
-                          Siap diunduh
-                        </span>
-                      ) : phaseLabel}
-                    </span>
-                    <span className="apple-progress-percent">
-                      {phase === 'compressing' ? '' : `${progress}%`}
-                    </span>
+          <div style={{
+            background: 'var(--color-canvas-soft)',
+            borderTop: '1px solid var(--color-hairline)',
+            padding: '14px 20px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 12,
+          }}>
+            <button className="sg-btn sg-btn-outline" onClick={() => setStep(2)}>← Kembali</button>
+            <button
+              className="sg-btn sg-btn-primary sg-btn-pill"
+              style={{ fontSize: 14, padding: '9px 20px' }}
+              disabled={isGenerating}
+              onClick={generate}
+            >
+              {isGenerating ? 'Memproses…' : `Buat & unduh ZIP (${validCount})`}
+            </button>
+          </div>
+
+          {/* Progress */}
+          {isGenerating && (
+            <div style={{ padding: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                <div className="sg-spinner" />
+                <span style={{ fontSize: 14, color: 'var(--color-ink)' }}>
+                  {phase === 'generating' ? `${done + 1} dari ${validCount} · ${currentName}` :
+                   phase === 'compressing' ? 'Mengemas berkas ZIP…' : 'Selesai'}
+                </span>
+                <span style={{ marginLeft: 'auto', fontSize: 24, fontWeight: 700, color: 'var(--color-primary)' }}>
+                  {progress}%
+                </span>
+              </div>
+              <div className="apple-progress-track">
+                <div
+                  className={`apple-progress-fill ${phase === 'generating' ? 'shimmer' : phase === 'compressing' ? 'indeterminate' : 'complete'}`}
+                  style={{ width: `${phase === 'compressing' ? 40 : progress}%` }}
+                />
+              </div>
+              <div className="sg-phase-cards">
+                <div className={`sg-phase-card ${done > 0 ? 'done' : ''}`}>
+                  <div className="sg-phase-card-label">Membuat PDF</div>
+                  <div className="sg-phase-card-status">
+                    {phase === 'generating' ? <span className="sg-spinner" /> :
+                     (phase === 'compressing' || phase === 'complete') ? '✓' : ''}
+                    {phase === 'generating' ? 'Berlangsung' :
+                     (phase === 'compressing' || phase === 'complete') ? 'Selesai' : 'Menunggu'}
                   </div>
-                  <div className="apple-progress-track">
-                    <div className={fillClass} style={{ width: `${barWidth}%` }} />
+                </div>
+                <div className={`sg-phase-card ${phase === 'compressing' ? 'active' : ''}`}>
+                  <div className="sg-phase-card-label">Render halaman</div>
+                  <div className="sg-phase-card-status">
+                    {phase === 'compressing' ? <span className="sg-spinner" /> : ''}
+                    {phase === 'compressing' ? 'Berlangsung' : 'Menunggu'}
                   </div>
-                  <div className="apple-progress-detail">
-                    <span className="apple-progress-current">
-                      {phase === 'generating' && currentName
-                        ? `${done + 1} dari ${validCount} · ${currentName}`
-                        : phase === 'compressing'
-                          ? `Mengemas ${validCount} sertifikat ke dalam ZIP`
-                          : phase === 'complete'
-                            ? `${validCount} sertifikat berhasil dibuat`
-                            : ''}
-                    </span>
+                </div>
+                <div className={`sg-phase-card ${phase === 'complete' ? 'done' : ''}`}>
+                  <div className="sg-phase-card-label">Kompres ZIP</div>
+                  <div className="sg-phase-card-status">
+                    {phase === 'complete' ? '✓ Selesai' : 'Menunggu'}
                   </div>
                 </div>
               </div>
-            )}
-          </div>
-          {certificates.length > 0 && (
-            <SendEmailPanel eventId={event.id} certificates={certificates}>
-              <h4 className="apple-h4 apple-mb-sm">Kirim via Email</h4>
-              <SendEmailPanel.TemplateEditor />
-              <SendEmailPanel.RecipientTable />
-              <SendEmailPanel.SendButton />
-            </SendEmailPanel>
+            </div>
           )}
-        </>
+        </div>
+      )}
+
+      {/* Step 4: Email */}
+      {step === 4 && certificates.length > 0 && (
+        <div style={{ marginTop: 8 }}>
+          <SendEmailPanel eventId={event.id} certificates={certificates}>
+            <SendEmailPanel.TemplateEditor />
+            <SendEmailPanel.RecipientTable />
+            <SendEmailPanel.SendButton />
+          </SendEmailPanel>
+        </div>
       )}
     </div>
   );
