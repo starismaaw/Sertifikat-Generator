@@ -34,8 +34,22 @@ function fitFontSize(text: string, field: Field, font: PDFFont): number {
   return size;
 }
 
+// Use browser canvas measurement so PDF centering matches the Konva preview exactly.
+// Falls back to pdf-lib AFM metrics when canvas is unavailable (test / SSR env).
+function browserTextWidth(text: string, fontFamily: string, size: number, afmFallback: () => number): number {
+  try {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return afmFallback();
+    ctx.font = `${size}px "${fontFamily}"`;
+    return ctx.measureText(text).width;
+  } catch {
+    return afmFallback();
+  }
+}
+
 function alignedX(text: string, field: Field, font: PDFFont, size: number): number {
-  const w = font.widthOfTextAtSize(text, size);
+  const w = browserTextWidth(text, field.font, size, () => font.widthOfTextAtSize(text, size));
   if (field.perataan === 'center') return field.x + (field.lebar - w) / 2;
   if (field.perataan === 'right') return field.x + field.lebar - w;
   return field.x;
