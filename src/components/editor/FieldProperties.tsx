@@ -3,8 +3,7 @@ import type { CertEvent, Field, Perataan } from '../../types';
 import { ColorPickerField } from './ColorPickerField';
 import { AlignmentToolbar } from './AlignmentToolbar';
 import { FIELD_LABELS } from './FieldPalette';
-
-const FONTS: Field['font'][] = ['Helvetica', 'Times', 'Courier'];
+import { FONT_FAMILIES, FONT_WEIGHTS } from '../../lib/fontRegistry';
 
 function safeNum(val: string, fallback: number): number {
   const n = Number(val);
@@ -138,14 +137,32 @@ function FieldTab({
         <div className="sg-props-section-title">Huruf</div>
         <select
           className="sg-select"
-          value={selected.font}
-          onChange={e => onField({ font: e.target.value as Field['font'] })}
+          value={selected.fontFamily}
+          onChange={e => onField({ fontFamily: e.target.value })}
+          style={{ marginBottom: 8 }}
         >
-          {FONTS.map(f => <option key={f}>{f}</option>)}
+          {FONT_FAMILIES.map(f => (
+            <option key={f.value} value={f.value} style={{ fontFamily: f.value }}>
+              {f.label}
+            </option>
+          ))}
         </select>
-        <div className="sg-hint" style={{ marginTop: 6 }}>
-          Tersedia: Helvetica, Times, Courier (batas PDF)
-        </div>
+        <select
+          className="sg-select"
+          value={selected.fontWeight}
+          onChange={e => onField({ fontWeight: e.target.value as Field['fontWeight'] })}
+        >
+          {FONT_WEIGHTS.map(w => {
+            const currentFont = FONT_FAMILIES.find(f => f.value === selected.fontFamily);
+            const isItalicVariant = w.value === 'Italic' || w.value === 'BoldItalic';
+            const disabled = isItalicVariant && currentFont ? !currentFont.hasItalic : false;
+            return (
+              <option key={w.value} value={w.value} disabled={disabled}>
+                {w.label}
+              </option>
+            );
+          })}
+        </select>
       </div>
 
       <div className="sg-event-divider" style={{ margin: '12px 0' }} />

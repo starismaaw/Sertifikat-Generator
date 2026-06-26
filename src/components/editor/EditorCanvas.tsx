@@ -7,6 +7,15 @@ import { FIELD_LABELS } from './FieldPalette';
 const MAX_W = 680;
 const BOUNDARY_PADDING = 4;
 
+function konvaFontStyle(weight: string): string {
+  switch (weight) {
+    case 'Bold':       return 'bold';
+    case 'Italic':     return 'italic';
+    case 'BoldItalic': return 'bold italic';
+    default:           return 'normal';
+  }
+}
+
 function useHtmlImage(src: string): HTMLImageElement | undefined {
   const [img, setImg] = useState<HTMLImageElement | undefined>(undefined);
   useEffect(() => {
@@ -88,7 +97,8 @@ export function EditorCanvas({
                     text={FIELD_LABELS[f.tipe]}
                     x={sx}
                     y={sy}
-                    fontFamily={f.font}
+                    fontFamily={f.fontFamily}
+                    fontStyle={konvaFontStyle(f.fontWeight)}
                     fontSize={f.ukuran * scale}
                     fill={f.warna}
                     width={sw}

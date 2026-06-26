@@ -9,7 +9,8 @@ function makeEvent(): CertEvent {
     background: PNG_1x1, bgWidth: 800, bgHeight: 600,
     fields: [{
       id: 'f1', tipe: 'nama', x: 100, y: 200, lebar: 600,
-      font: 'Helvetica', ukuran: 32, warna: '#000000', perataan: 'center', formatter: 'none',
+      fontFamily: 'Playfair Display', fontWeight: 'Regular',
+      ukuran: 32, warna: '#000000', perataan: 'center', formatter: 'none',
     }],
     polaNomor: '{n}', nomorMulai: 1, nomorPadding: 3, nomorTerakhir: 0,
     penandatangan: { nama: 'Dr. X', jabatan: 'Kepala' },

@@ -3,6 +3,15 @@ import { Stage, Layer, Image as KImage, Text } from 'react-konva';
 import type { CertEvent } from '../../types';
 import { resolveValues } from '../../lib/resolveValues';
 
+function konvaFontStyle(weight: string): string {
+  switch (weight) {
+    case 'Bold':       return 'bold';
+    case 'Italic':     return 'italic';
+    case 'BoldItalic': return 'bold italic';
+    default:           return 'normal';
+  }
+}
+
 function useHtmlImage(src: string): HTMLImageElement | undefined {
   const [img, setImg] = useState<HTMLImageElement | undefined>(undefined);
   useEffect(() => {
@@ -55,7 +64,8 @@ export function CertPreviewMini({
                     text={displayText}
                     x={f.x * scale}
                     y={f.y * scale}
-                    fontFamily={f.font}
+                    fontFamily={f.fontFamily}
+                    fontStyle={konvaFontStyle(f.fontWeight)}
                     fontSize={f.ukuran * scale}
                     fill={f.warna}
                     width={f.lebar * scale}

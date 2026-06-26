@@ -1,3 +1,5 @@
+import type { FontWeight } from './lib/fontRegistry';
+
 export type FieldTipe =
   | 'nama'
   | 'nomor'
@@ -15,7 +17,8 @@ export interface Field {
   x: number;        // natural-pixel anchor X
   y: number;        // natural-pixel baseline Y from top
   lebar: number;    // natural-pixel width of the text box
-  font: 'Helvetica' | 'Times' | 'Courier';
+  fontFamily: string;
+  fontWeight: FontWeight;
   ukuran: number;   // font size in natural pixels
   warna: string;    // hex, e.g. '#000000'
   perataan: Perataan;
