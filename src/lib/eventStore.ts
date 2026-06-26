@@ -9,7 +9,15 @@ function readAll(): CertEvent[] {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     const events = parsed as CertEvent[];
-    events.forEach(e => e.fields.forEach(f => { if (!f.formatter) f.formatter = 'none'; }));
+    events.forEach(e => e.fields.forEach(f => {
+      if (!f.formatter) f.formatter = 'none';
+      const legacy = f as unknown as Record<string, unknown>;
+      if (!f.fontFamily) {
+        f.fontFamily = 'Playfair Display';
+        f.fontWeight = 'Regular';
+        delete legacy['font'];
+      }
+    }));
     return events;
   } catch {
     return [];

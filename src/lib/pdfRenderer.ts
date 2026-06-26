@@ -1,15 +1,11 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont } from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
 import type { CertEvent, Field, FieldValues } from '../types';
+import { getFontPath, type FontWeight } from './fontRegistry';
 
 /** A 1x1 transparent PNG data URL — handy default/test background. */
 export const PNG_1x1 =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC';
-
-const FONT_MAP: Record<string, StandardFonts> = {
-  Helvetica: StandardFonts.Helvetica,
-  Times: StandardFonts.TimesRoman,
-  Courier: StandardFonts.Courier,
-};
 
 function hexToRgb(hex: string) {
   const h = hex.replace('#', '');
@@ -34,14 +30,26 @@ function fitFontSize(text: string, field: Field, font: PDFFont): number {
   return size;
 }
 
+function toCssFont(fontFamily: string, fontWeight: FontWeight, size: number): string {
+  const italic = fontWeight === 'Italic' || fontWeight === 'BoldItalic';
+  const bold   = fontWeight === 'Bold'   || fontWeight === 'BoldItalic';
+  return `${italic ? 'italic ' : ''}${bold ? 'bold ' : ''}${size}px "${fontFamily}"`;
+}
+
 // Use browser canvas measurement so PDF centering matches the Konva preview exactly.
 // Falls back to pdf-lib AFM metrics when canvas is unavailable (test / SSR env).
-function browserTextWidth(text: string, fontFamily: string, size: number, afmFallback: () => number): number {
+function browserTextWidth(
+  text: string,
+  fontFamily: string,
+  fontWeight: FontWeight,
+  size: number,
+  afmFallback: () => number,
+): number {
   try {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     if (!ctx) return afmFallback();
-    ctx.font = `${size}px "${fontFamily}"`;
+    ctx.font = toCssFont(fontFamily, fontWeight, size);
     return ctx.measureText(text).width;
   } catch {
     return afmFallback();
@@ -49,9 +57,15 @@ function browserTextWidth(text: string, fontFamily: string, size: number, afmFal
 }
 
 function alignedX(text: string, field: Field, font: PDFFont, size: number): number {
-  const w = browserTextWidth(text, field.font, size, () => font.widthOfTextAtSize(text, size));
+  const w = browserTextWidth(
+    text,
+    field.fontFamily,
+    field.fontWeight,
+    size,
+    () => font.widthOfTextAtSize(text, size),
+  );
   if (field.perataan === 'center') return field.x + (field.lebar - w) / 2;
-  if (field.perataan === 'right') return field.x + field.lebar - w;
+  if (field.perataan === 'right')  return field.x + field.lebar - w;
   return field.x;
 }
 
@@ -61,6 +75,8 @@ export async function renderCertificate(
   values: FieldValues,
 ): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
+  doc.registerFontkit(fontkit);
+
   const page = doc.addPage([event.bgWidth, event.bgHeight]);
 
   const bgBytes = dataUrlToBytes(event.background);
@@ -70,17 +86,27 @@ export async function renderCertificate(
   page.drawImage(img, { x: 0, y: 0, width: event.bgWidth, height: event.bgHeight });
 
   const fontCache = new Map<string, PDFFont>();
-  const getFont = async (name: string) => {
-    if (!fontCache.has(name)) {
-      fontCache.set(name, await doc.embedFont(FONT_MAP[name] ?? StandardFonts.Helvetica));
+
+  const getFont = async (family: string, weight: FontWeight): Promise<PDFFont> => {
+    const key = `${family}-${weight}`;
+    if (!fontCache.has(key)) {
+      try {
+        const res = await fetch(getFontPath(family, weight));
+        if (!res.ok) throw new Error(`Font fetch failed: ${getFontPath(family, weight)}`);
+        const bytes = await res.arrayBuffer();
+        fontCache.set(key, await doc.embedFont(bytes, { subset: true }));
+      } catch {
+        fontCache.set(key, await doc.embedFont(StandardFonts.Helvetica));
+      }
     }
-    return fontCache.get(name)!;
+    return fontCache.get(key)!;
   };
 
   for (const field of event.fields) {
     const text = (values[field.tipe] ?? '').toString();
     if (!text) continue;
-    const font = await getFont(field.font);
+
+    const font = await getFont(field.fontFamily, field.fontWeight);
     const size = fitFontSize(text, field, font);
     // field.y is the TOP of the text box (Konva origin: top-left, y grows down).
     // pdf-lib drawText y is the BASELINE (origin: bottom-left, y grows up).
