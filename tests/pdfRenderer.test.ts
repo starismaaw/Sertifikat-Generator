@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { PDFDocument, PDFName, PDFRawStream } from 'pdf-lib';
-import { renderCertificate, renderPakta, PNG_1x1, type PaktaTemplate } from '../src/lib/pdfRenderer';
-import type { CertEvent } from '../src/types';
+import { PDFDocument, PDFName, PDFRawStream, PDFRef, PDFArray, decodePDFRawStream } from 'pdf-lib';
+import { renderCertificate, renderPakta, PNG_1x1 } from '../src/lib/pdfRenderer';
+import type { CertEvent, PaktaTemplate } from '../src/types';
 
 function makeEvent(): CertEvent {
   return {
@@ -34,6 +34,30 @@ describe('renderCertificate', () => {
 
 function makePaktaTemplate(fields: PaktaTemplate['fields']): PaktaTemplate {
   return { background: PNG_1x1, bgWidth: 800, bgHeight: 600, fields };
+}
+
+/** Decode page content stream(s) to string for coordinate verification. */
+async function pageContentText(doc: PDFDocument, pageIndex = 0): Promise<string> {
+  const page = doc.getPage(pageIndex);
+  const contentsRef = page.node.get(PDFName.of('Contents'));
+  const parts: string[] = [];
+
+  const decode = (ref: PDFRef) => {
+    const obj = doc.context.lookup(ref);
+    if (obj instanceof PDFRawStream) {
+      const decoded = decodePDFRawStream(obj).decode();
+      parts.push(new TextDecoder().decode(decoded));
+    }
+  };
+
+  if (contentsRef instanceof PDFRef) {
+    decode(contentsRef);
+  } else if (contentsRef instanceof PDFArray) {
+    for (const item of contentsRef.asArray()) {
+      if (item instanceof PDFRef) decode(item);
+    }
+  }
+  return parts.join('\n');
 }
 
 /** Hitung jumlah image XObject (latar + tanda tangan) dalam PDF. */
@@ -101,5 +125,25 @@ describe('renderPakta', () => {
     const doc = await PDFDocument.load(bytes);
     expect(Math.round(doc.getPage(0).getWidth())).toBe(800);
     expect(bytes.byteLength).toBeGreaterThan(100);
+  });
+
+  it('menempatkan PNG tanda tangan pada koordinat field yang benar', async () => {
+    // x=50, y=100, lebar=300, tinggi=150, bgHeight=600
+    // y_pdf = bgHeight - y - tinggi = 600 - 100 - 150 = 350
+    // pdf-lib decomposes drawImage into stacked cm operators:
+    //   "1 0 0 1 50 350 cm"  ← translation to (x=50, y_pdf=350)
+    //   "300 0 0 150 0 0 cm" ← scale to (width=300, height=150)
+    const tpl = makePaktaTemplate([
+      { id: 's1', tipe: 'tandaTangan', x: 50, y: 100, lebar: 300, tinggi: 150,
+        fontFamily: 'Playfair Display', fontWeight: 'Regular',
+        ukuran: 12, warna: '#000000', perataan: 'left', formatter: 'none' },
+    ]);
+    const bytes = await renderPakta(tpl, {}, PNG_1x1);
+    const doc = await PDFDocument.load(bytes);
+    const content = await pageContentText(doc);
+    // Y-flip formula: bgHeight(600) - y(100) - tinggi(150) = 350
+    // Verify translation (x, y_pdf) and scale (width, height) are present
+    expect(content).toContain('1 0 0 1 50 350 cm');
+    expect(content).toContain('300 0 0 150 0 0 cm');
   });
 });

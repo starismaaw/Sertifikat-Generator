@@ -1,6 +1,6 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
-import type { CertEvent, Field, FieldValues } from '../types';
+import type { CertEvent, Field, FieldValues, PaktaTemplate } from '../types';
 import { getFontPath, type FontWeight } from './fontRegistry';
 
 /** A 1x1 transparent PNG data URL — handy default/test background. */
@@ -125,14 +125,6 @@ async function drawTextField(
   });
 }
 
-/** Template Pakta minimal untuk rendering (tanpa ketergantungan tipe backend). */
-export interface PaktaTemplate {
-  background: string;   // data URL
-  bgWidth: number;      // lebar natural px
-  bgHeight: number;     // tinggi natural px
-  fields: Field[];
-}
-
 /**
  * Render satu Pakta Integritas ke PDF.
  * `values` mengisi field teks; `signaturePng` (data URL) disisipkan pada field
@@ -151,13 +143,17 @@ export async function renderPakta(
 
   const getFont = makeFontGetter(doc);
 
+  const hasTandaTangan = template.fields.some(f => f.tipe === 'tandaTangan');
+  const sigImage = (signaturePng && hasTandaTangan)
+    ? await doc.embedPng(dataUrlToBytes(signaturePng))
+    : null;
+
   for (const field of template.fields) {
     if (field.tipe === 'tandaTangan') {
-      if (!signaturePng) continue;
-      const sig = await doc.embedPng(dataUrlToBytes(signaturePng));
+      if (!sigImage) continue;
       const h = field.tinggi ?? field.lebar / 2;
       // field.y = TOP kotak; konversi ke origin bawah pdf-lib.
-      page.drawImage(sig, {
+      page.drawImage(sigImage, {
         x: field.x,
         y: template.bgHeight - field.y - h,
         width: field.lebar,

@@ -8,6 +8,9 @@ const LABELS: Record<FieldTipe, string> = {
   peran: 'Peran / jabatan',
   namaPenandatangan: 'Nama penandatangan',
   penandatangan: 'Jabatan penandatangan',
+  nip: 'NIP',
+  jabatan: 'Jabatan',
+  tandaTangan: 'Tanda Tangan',
 };
 
 const SECTIONS: { label: string; fields: FieldTipe[] }[] = [
