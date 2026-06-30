@@ -80,4 +80,26 @@ describe('renderPakta', () => {
     expect(countImages(tanpa)).toBe(1);
     expect(countImages(dengan)).toBe(2);
   });
+
+  it('mengabaikan signaturePng bila tidak ada field tandaTangan', async () => {
+    const tpl = makePaktaTemplate([
+      { id: 'f1', tipe: 'nama', x: 100, y: 200, lebar: 600,
+        fontFamily: 'Playfair Display', fontWeight: 'Regular',
+        ukuran: 28, warna: '#000000', perataan: 'center', formatter: 'none' },
+    ]);
+    const doc = await PDFDocument.load(await renderPakta(tpl, { nama: 'Budi' }, PNG_1x1));
+    expect(countImages(doc)).toBe(1); // hanya latar
+  });
+
+  it('tetap menghasilkan PDF valid bila field tandaTangan ada tapi belum digores', async () => {
+    const tpl = makePaktaTemplate([
+      { id: 's1', tipe: 'tandaTangan', x: 500, y: 400, lebar: 200, tinggi: 100,
+        fontFamily: 'Playfair Display', fontWeight: 'Regular',
+        ukuran: 12, warna: '#000000', perataan: 'left', formatter: 'none' },
+    ]);
+    const bytes = await renderPakta(tpl, {}, null);
+    const doc = await PDFDocument.load(bytes);
+    expect(Math.round(doc.getPage(0).getWidth())).toBe(800);
+    expect(bytes.byteLength).toBeGreaterThan(100);
+  });
 });
