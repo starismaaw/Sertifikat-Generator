@@ -125,6 +125,42 @@ async function drawTextField(
   });
 }
 
+/** Template Pakta minimal untuk rendering (tanpa ketergantungan tipe backend). */
+export interface PaktaTemplate {
+  background: string;   // data URL
+  bgWidth: number;      // lebar natural px
+  bgHeight: number;     // tinggi natural px
+  fields: Field[];
+}
+
+/**
+ * Render satu Pakta Integritas ke PDF.
+ * `values` mengisi field teks; `signaturePng` (data URL) disisipkan pada field
+ * bertipe 'tandaTangan'. Bila null, field tanda tangan dilewati.
+ */
+export async function renderPakta(
+  template: PaktaTemplate,
+  values: FieldValues,
+  signaturePng: string | null,
+): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  doc.registerFontkit(fontkit);
+
+  const page = doc.addPage([template.bgWidth, template.bgHeight]);
+  await drawBackground(doc, page, template.background, template.bgWidth, template.bgHeight);
+
+  const getFont = makeFontGetter(doc);
+
+  for (const field of template.fields) {
+    if (field.tipe === 'tandaTangan') continue; // ditangani di Task 4
+    const text = (values[field.tipe] ?? '').toString();
+    if (!text) continue;
+    await drawTextField(page, field, text, getFont, template.bgHeight);
+  }
+
+  return doc.save();
+}
+
 /** Render one certificate to PDF bytes. `values` supplies dynamic field text. */
 export async function renderCertificate(
   event: CertEvent,
