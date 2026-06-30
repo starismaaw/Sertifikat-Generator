@@ -90,24 +90,30 @@ export function EventList() {
             <div className="sg-home-subtitle">{events.length} kegiatan tersimpan</div>
           )}
         </div>
+        <div className="sg-home-actions">
         {events.length > 0 && (
-          <div className="sg-home-actions">
-            <div className="sg-search">
-              <SearchIcon />
-              <input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Cari kegiatan…"
-              />
-            </div>
-            <button
-              className="sg-btn sg-btn-primary sg-btn-pill"
-              onClick={() => setShowNew(true)}
-            >
-              <PlusIcon /> Buat kegiatan
-            </button>
+          <div className="sg-search">
+            <SearchIcon />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Cari kegiatan…"
+            />
           </div>
         )}
+        <button
+          className="sg-btn sg-btn-primary sg-btn-pill"
+          onClick={() => setShowNew(true)}
+        >
+          <PlusIcon /> Buat kegiatan
+        </button>
+        <button
+          className="sg-btn sg-btn-secondary sg-btn-pill"
+          onClick={() => navigate({ name: 'pakta-admin' })}
+        >
+          Pakta Integritas
+        </button>
+      </div>
       </div>
 
       {error && <div className="apple-error" style={{ marginBottom: 20 }}>{error}</div>}
