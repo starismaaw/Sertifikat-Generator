@@ -1,12 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { createClient } from '@supabase/supabase-js';
-
-function makeClient() {
-  const url = process.env.VITE_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('Supabase belum dikonfigurasi di server');
-  return createClient(url, key);
-}
+import { makeServiceClient } from './_supabase';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -23,9 +16,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: 'signerId dan eventId wajib diisi' });
       }
 
-      let sb: ReturnType<typeof makeClient>;
+      let sb: ReturnType<typeof makeServiceClient>;
       try {
-        sb = makeClient();
+        sb = makeServiceClient();
       } catch (e) {
         return res.status(500).json({ error: (e as Error).message });
       }

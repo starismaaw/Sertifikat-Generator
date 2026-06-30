@@ -20,11 +20,13 @@ export const SignaturePad = forwardRef<SignaturePadHandle>(function SignaturePad
 
     function resizeCanvas() {
       if (!canvas || !padRef.current) return;
+      const strokes = padRef.current.toData();
       const ratio = Math.max(window.devicePixelRatio ?? 1, 1);
       canvas.width = canvas.offsetWidth * ratio;
       canvas.height = canvas.offsetHeight * ratio;
       canvas.getContext('2d')?.scale(ratio, ratio);
       padRef.current.clear();
+      if (strokes.length > 0) padRef.current.fromData(strokes);
     }
 
     const observer = new ResizeObserver(resizeCanvas);
