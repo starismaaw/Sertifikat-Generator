@@ -69,7 +69,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     case 'update_event': {
-      const { id, ...patch } = body as { id: string; [k: string]: unknown };
+      const { id, action: _action, ...patch } = body as { id: string; action: string; [k: string]: unknown };
       if (!id) return res.status(400).json({ error: 'id acara wajib diisi' });
       const { error } = await sb.from('pakta_events').update(patch).eq('id', id);
       if (error) return res.status(500).json({ error: error.message });

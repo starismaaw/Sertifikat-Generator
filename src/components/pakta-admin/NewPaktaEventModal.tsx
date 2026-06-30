@@ -69,7 +69,7 @@ export function NewPaktaEventModal({ onClose }: { onClose: () => void }) {
       if (!uploadRes.ok) throw new Error('Gagal mengunggah gambar template');
 
       // 3. Buat acara di Supabase
-      const { event } = await callAdmin<{ event: { id: string } }>('create_event', {
+      const { event } = await callAdmin<{ event: { id: string } | null }>('create_event', {
         nama: nama.trim(),
         tanggal,
         template_path: path,
@@ -78,6 +78,7 @@ export function NewPaktaEventModal({ onClose }: { onClose: () => void }) {
         fields: [],
       });
 
+      if (!event) throw new Error('Gagal membuat acara: data tidak dikembalikan');
       navigate({ name: 'pakta-editor', eventId: event.id });
       onClose();
     } catch (err) {

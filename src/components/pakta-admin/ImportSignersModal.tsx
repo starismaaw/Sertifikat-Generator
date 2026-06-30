@@ -147,7 +147,7 @@ export function ImportSignersModal({
                     </table>
                   </div>
                   <p className="apple-caption" style={{ marginTop: 8 }}>
-                    Total: {rows.filter(r => (mapping.nama ? r[mapping.nama] : '').trim()).length} baris valid
+                    Total: {rows.filter(r => (mapping.nama ? r[mapping.nama] ?? '' : '').trim()).length} baris valid
                   </p>
                 </>
               )}
@@ -162,7 +162,7 @@ export function ImportSignersModal({
               onClick={handleImport}
               disabled={loading || !mapping.nama}
             >
-              {loading ? 'Mengimpor…' : `Impor ${rows.filter(r => (mapping.nama ? r[mapping.nama] : '').trim()).length} Pegawai`}
+              {loading ? 'Mengimpor…' : `Impor ${rows.filter(r => (mapping.nama ? r[mapping.nama] ?? '' : '').trim()).length} Pegawai`}
             </button>
           )}
         </div>

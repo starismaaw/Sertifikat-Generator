@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
 
 interface PaktaAdminCtx {
   password: string;
@@ -21,7 +21,7 @@ export function PaktaAdminProvider({ children }: { children: ReactNode }) {
     setPasswordState('');
   }
 
-  async function callAdmin<T = unknown>(
+  const callAdmin = useCallback(async function<T = unknown>(
     action: string,
     body: Record<string, unknown> = {},
   ): Promise<T> {
@@ -36,7 +36,7 @@ export function PaktaAdminProvider({ children }: { children: ReactNode }) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
     return data as T;
-  }
+  }, [password]);
 
   return (
     <Ctx.Provider value={{
