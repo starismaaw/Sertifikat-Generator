@@ -11,6 +11,7 @@ import { AdminLogin } from './components/pakta-admin/AdminLogin';
 import { PaktaEventList } from './components/pakta-admin/PaktaEventList';
 import { PaktaEditor } from './components/pakta-admin/PaktaEditor';
 import { PaktaDashboard } from './components/pakta-admin/PaktaDashboard';
+import { PaktaSignPage } from './components/pakta-signer/PaktaSignPage';
 
 function PaktaAdminRoot() {
   const { isLoggedIn } = usePaktaAdmin();
@@ -28,6 +29,11 @@ function PaktaAdminRoot() {
 export default function App() {
   const view = useView();
   const [saveState] = useState<SaveState>('synced');
+
+  // Halaman publik — tidak butuh admin context
+  if (view.name === 'pakta-signer') {
+    return <PaktaSignPage key={view.eventId} eventId={view.eventId} />;
+  }
 
   const isPaktaView = view.name === 'pakta-admin' || view.name === 'pakta-editor' || view.name === 'pakta-dashboard';
 

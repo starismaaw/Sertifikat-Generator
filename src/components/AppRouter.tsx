@@ -6,7 +6,8 @@ export type View =
   | { name: 'generate'; eventId: string }
   | { name: 'pakta-admin' }
   | { name: 'pakta-editor'; eventId: string }
-  | { name: 'pakta-dashboard'; eventId: string };
+  | { name: 'pakta-dashboard'; eventId: string }
+  | { name: 'pakta-signer'; eventId: string };
 
 function parseHash(): View {
   const h = window.location.hash.replace(/^#/, '');
@@ -16,12 +17,14 @@ function parseHash(): View {
   if (name === 'pakta-admin')            return { name: 'pakta-admin' };
   if (name === 'pakta-editor' && id)     return { name: 'pakta-editor', eventId: id };
   if (name === 'pakta-dashboard' && id)  return { name: 'pakta-dashboard', eventId: id };
+  if (name === 'pakta' && id)            return { name: 'pakta-signer', eventId: id };
   return { name: 'home' };
 }
 
 export function navigate(view: View): void {
   if (view.name === 'home')              window.location.hash = '';
   else if (view.name === 'pakta-admin') window.location.hash = 'pakta-admin';
+  else if (view.name === 'pakta-signer') window.location.hash = `pakta/${view.eventId}`;
   else window.location.hash = `${view.name}/${view.eventId}`;
 }
 
