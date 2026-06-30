@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, PDFName, PDFRawStream } from 'pdf-lib';
 import { renderCertificate, renderPakta, PNG_1x1, type PaktaTemplate } from '../src/lib/pdfRenderer';
 import type { CertEvent } from '../src/types';
 
@@ -36,6 +36,18 @@ function makePaktaTemplate(fields: PaktaTemplate['fields']): PaktaTemplate {
   return { background: PNG_1x1, bgWidth: 800, bgHeight: 600, fields };
 }
 
+/** Hitung jumlah image XObject (latar + tanda tangan) dalam PDF. */
+function countImages(doc: PDFDocument): number {
+  let n = 0;
+  for (const [, obj] of doc.context.enumerateIndirectObjects()) {
+    if (obj instanceof PDFRawStream &&
+        obj.dict.get(PDFName.of('Subtype')) === PDFName.of('Image')) {
+      n++;
+    }
+  }
+  return n;
+}
+
 describe('renderPakta', () => {
   it('menghasilkan PDF seukuran latar dengan field teks terisi', async () => {
     const tpl = makePaktaTemplate([
@@ -52,5 +64,20 @@ describe('renderPakta', () => {
     expect(Math.round(page.getWidth())).toBe(800);
     expect(Math.round(page.getHeight())).toBe(600);
     expect(bytes.byteLength).toBeGreaterThan(100);
+  });
+
+  it('menyisipkan gambar tanda tangan saat field tandaTangan ada', async () => {
+    const tpl = makePaktaTemplate([
+      { id: 's1', tipe: 'tandaTangan', x: 500, y: 400, lebar: 200, tinggi: 100,
+        fontFamily: 'Playfair Display', fontWeight: 'Regular',
+        ukuran: 12, warna: '#000000', perataan: 'left', formatter: 'none' },
+    ]);
+
+    const tanpa = await PDFDocument.load(await renderPakta(tpl, {}, null));
+    const dengan = await PDFDocument.load(await renderPakta(tpl, {}, PNG_1x1));
+
+    // Tanpa ttd: hanya latar (1 image). Dengan ttd: latar + ttd (2 image).
+    expect(countImages(tanpa)).toBe(1);
+    expect(countImages(dengan)).toBe(2);
   });
 });

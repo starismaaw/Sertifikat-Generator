@@ -152,7 +152,19 @@ export async function renderPakta(
   const getFont = makeFontGetter(doc);
 
   for (const field of template.fields) {
-    if (field.tipe === 'tandaTangan') continue; // ditangani di Task 4
+    if (field.tipe === 'tandaTangan') {
+      if (!signaturePng) continue;
+      const sig = await doc.embedPng(dataUrlToBytes(signaturePng));
+      const h = field.tinggi ?? field.lebar / 2;
+      // field.y = TOP kotak; konversi ke origin bawah pdf-lib.
+      page.drawImage(sig, {
+        x: field.x,
+        y: template.bgHeight - field.y - h,
+        width: field.lebar,
+        height: h,
+      });
+      continue;
+    }
     const text = (values[field.tipe] ?? '').toString();
     if (!text) continue;
     await drawTextField(page, field, text, getFont, template.bgHeight);
