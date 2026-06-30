@@ -122,4 +122,33 @@ describe('pakta-admin handler', () => {
     expect(res.statusCode).toBe(200);
     expect(res.body.imported).toBe(2);
   });
+
+  // WHY: upload template gambar harus lewat signed URL agar file langsung ke Supabase Storage.
+  it('get_template_upload_url mengembalikan signedUrl', async () => {
+    fromAdminMock.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        createSignedUploadUrl: vi.fn().mockResolvedValue({
+          data: { signedUrl: 'https://storage.supabase.co/upload/signed?token=abc' },
+          error: null,
+        }),
+      }),
+    });
+    // Supabase storage mock via sb.storage.from(...).createSignedUploadUrl
+    // Patch: mock di level createClientMock sehingga sb.storage tersedia
+    createClientMock.mockReturnValue({
+      from: fromAdminMock,
+      storage: {
+        from: vi.fn().mockReturnValue({
+          createSignedUploadUrl: vi.fn().mockResolvedValue({
+            data: { signedUrl: 'https://storage.supabase.co/upload/signed?token=abc' },
+            error: null,
+          }),
+        }),
+      },
+    });
+    const res = mockRes();
+    await handler(mockReq({ action: 'get_template_upload_url', path: 'events/ev1/template.png' }), res);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.signedUrl).toContain('token=abc');
+  });
 });

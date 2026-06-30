@@ -118,6 +118,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ url: data.signedUrl });
     }
 
+    case 'get_template_upload_url': {
+      const { path } = body as { path: string };
+      if (!path) return res.status(400).json({ error: 'path wajib diisi' });
+      const { data, error } = await sb.storage
+        .from('pakta-templates')
+        .createSignedUploadUrl(path);
+      if (error) return res.status(500).json({ error: error.message });
+      return res.status(200).json({ signedUrl: data.signedUrl });
+    }
+
     default:
       return res.status(400).json({ error: `Action tidak dikenal: ${action}` });
   }
