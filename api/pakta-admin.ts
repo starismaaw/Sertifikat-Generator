@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { createClient } from '@supabase/supabase-js';
 import { timingSafeEqual } from 'crypto';
+import { makeServiceClient } from './_supabase';
 
 function verifyPassword(provided: string): boolean {
   const expected = process.env.PAKTA_ADMIN_PASSWORD ?? '';
@@ -15,13 +15,6 @@ function verifyPassword(provided: string): boolean {
   }
 }
 
-function makeAdmin() {
-  const url = process.env.VITE_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('Supabase belum dikonfigurasi di server');
-  return createClient(url, key);
-}
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -32,9 +25,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(401).json({ error: 'Tidak diizinkan' });
   }
 
-  let sb: ReturnType<typeof makeAdmin>;
+  let sb: ReturnType<typeof makeServiceClient>;
   try {
-    sb = makeAdmin();
+    sb = makeServiceClient();
   } catch (e) {
     return res.status(500).json({ error: (e as Error).message });
   }

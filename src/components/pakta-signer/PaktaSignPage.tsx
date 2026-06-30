@@ -28,10 +28,12 @@ async function loadBackground(templatePath: string): Promise<string> {
 
 export function PaktaSignPage({ eventId }: { eventId: string }) {
   const [state, setState] = useState<PageState>({ step: 'loading' });
+  const [loadKey, setLoadKey] = useState(0);
   const sigPadRef = useRef<SignaturePadHandle>(null);
 
   useEffect(() => {
     let cancelled = false;
+    setState({ step: 'loading' });
     (async () => {
       const [template, signers] = await Promise.all([
         getAcaraPakta(eventId),
@@ -45,7 +47,7 @@ export function PaktaSignPage({ eventId }: { eventId: string }) {
       setState({ step: 'pickName', template, signers });
     })();
     return () => { cancelled = true; };
-  }, [eventId]);
+  }, [eventId, loadKey]);
 
   async function handleSelectSigner(signer: SignerRow) {
     if (state.step !== 'pickName') return;
@@ -99,7 +101,15 @@ export function PaktaSignPage({ eventId }: { eventId: string }) {
       });
       if (!uploadResp.ok) throw new Error('Gagal mengunggah dokumen ke server');
 
-      await updateSignerDone(signer.id, pdfPath);
+      try {
+        await updateSignerDone(signer.id, pdfPath);
+      } catch (dbErr) {
+        setState({
+          step: 'error',
+          message: `Dokumen berhasil diunggah namun gagal menyimpan status. ${(dbErr as Error).message}`,
+        });
+        return;
+      }
 
       setState({ step: 'success', signerNama: signer.nama });
     } catch (err) {
@@ -204,13 +214,7 @@ export function PaktaSignPage({ eventId }: { eventId: string }) {
           <button
             className="apple-btn apple-btn-secondary apple-btn-sm"
             style={{ marginBottom: 20 }}
-            onClick={() => {
-              setState({ step: 'loading' });
-              Promise.all([getAcaraPakta(eventId), listSigners(eventId)]).then(([t, s]) => {
-                if (!t) { setState({ step: 'notFound' }); return; }
-                setState({ step: 'pickName', template: t, signers: s });
-              });
-            }}
+            onClick={() => setLoadKey(k => k + 1)}
           >
             ← Pilih Nama Lain
           </button>
@@ -282,7 +286,7 @@ export function PaktaSignPage({ eventId }: { eventId: string }) {
           <p className="apple-error" style={{ marginBottom: 16 }}>{state.message}</p>
           <button
             className="apple-btn apple-btn-secondary"
-            onClick={() => setState({ step: 'loading' })}
+            onClick={() => setLoadKey(k => k + 1)}
           >
             Coba Lagi
           </button>
