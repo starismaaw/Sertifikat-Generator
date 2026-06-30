@@ -26,6 +26,5 @@
 - Pre-existing chunk size build warning (tidak blocking)
 
 ### Next Step
-- Bucket `pakta-templates` harus diubah ke PUBLIC di Supabase dashboard
-- Deploy branch ke Vercel dan uji end-to-end dengan event pakta nyata
-- Setelah diverifikasi: buat PR ke main
+- Bucket `pakta-templates` sudah PUBLIC di Supabase dashboard ✅
+- Deploy ke Vercel dan uji end-to-end dengan event pakta nyata
