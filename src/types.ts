@@ -7,7 +7,10 @@ export type FieldTipe =
   | 'tanggal'
   | 'peran'
   | 'penandatangan'
-  | 'namaPenandatangan';
+  | 'namaPenandatangan'
+  | 'nip'
+  | 'jabatan'
+  | 'tandaTangan';
 
 export type Perataan = 'left' | 'center' | 'right';
 
@@ -23,6 +26,8 @@ export interface Field {
   warna: string;    // hex, e.g. '#000000'
   perataan: Perataan;
   formatter: 'none' | 'uppercase';
+  /** Tinggi kotak (px natural). Hanya dipakai field tipe 'tandaTangan'. */
+  tinggi?: number;
 }
 
 export interface Penandatangan {
