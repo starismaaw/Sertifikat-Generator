@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { timingSafeEqual } from 'crypto';
-import { makeServiceClient } from './_supabase';
+import { makeServiceClient } from './_supabase.js';
 
 function verifyPassword(provided: string): boolean {
   const expected = process.env.PAKTA_ADMIN_PASSWORD ?? '';
