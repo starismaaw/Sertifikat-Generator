@@ -11,6 +11,7 @@ import { AdminLogin } from './components/pakta-admin/AdminLogin';
 import { PaktaEventList } from './components/pakta-admin/PaktaEventList';
 import { PaktaEditor } from './components/pakta-admin/PaktaEditor';
 import { PaktaDashboard } from './components/pakta-admin/PaktaDashboard';
+import { PaktaSignPage } from './components/pakta-signer/PaktaSignPage';
 
 function PaktaAdminRoot() {
   const { isLoggedIn } = usePaktaAdmin();
@@ -31,7 +32,7 @@ export default function App() {
 
   // Halaman publik — tidak butuh admin context
   if (view.name === 'pakta-signer') {
-    return <div style={{ padding: 32 }}>Halaman TTD Publik — {view.eventId}</div>;
+    return <PaktaSignPage key={view.eventId} eventId={view.eventId} />;
   }
 
   const isPaktaView = view.name === 'pakta-admin' || view.name === 'pakta-editor' || view.name === 'pakta-dashboard';
