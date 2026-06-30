@@ -1,56 +1,46 @@
 ## Agent Handoff
 
-**Branch:** feat/ui-redesign-2026
-**Task:** UI/UX Redesign — full implementation from design handoff ZIP
-**Last agent:** Claude Sonnet 4.6
-**Status:** Complete — build passing, all tests green, visual verified
+**Branch:** `claude/wonderful-solomon-6652df`
+**Task:** Rencana 3 — UI Admin Pakta Integritas (Tasks 1–9)
+**Last agent:** Claude Sonnet 4.6 (subagent-driven-development)
+**Status:** COMPLETE — semua 9 task selesai, final review bersih setelah fixes, siap push + PR
 
 ### Files Changed
-
-New files:
-- `src/components/AppTopbar.tsx`
-- `src/components/EventCard.tsx`
-- `src/components/NewEventModal.tsx`
-- `src/components/DeleteConfirmModal.tsx`
-- `src/components/AutoSaveToast.tsx`
-- `src/components/editor/ColorPickerField.tsx`
-- `src/components/editor/AlignmentToolbar.tsx`
-- `src/components/generate/CertPreviewMini.tsx`
-- `src/components/generate/StepperBar.tsx`
-- `tasks/todo.md`
-
-Modified:
-- `src/styles/apple-design.css` — new design tokens + ~600 lines of sg-* CSS
-- `src/App.tsx` — uses AppTopbar, removed old apple-nav/apple-page wrappers
-- `index.html` — Inter font (replaced Geist/Plus Jakarta Sans)
-- `src/components/EventList.tsx` — full rewrite (empty state, 3-col grid, search)
-- `src/components/editor/CertificateEditor.tsx` — grid toggle, toast, new layout
-- `src/components/editor/EditorCanvas.tsx` — showGrid prop, updated colors
-- `src/components/editor/FieldPalette.tsx` — sections, added/not-added states
-- `src/components/editor/FieldProperties.tsx` — tabs (Field/Acara), new sub-components
-- `src/components/generate/GenerateView.tsx` — new layout, sg-* classes
-- `src/components/generate/GenerateSingle.tsx` — 2-col layout + live preview
-- `src/components/generate/GenerateBulk.tsx` — stepper, drop zone, phase cards
-- `src/components/generate/ColumnMapper.tsx` — visual mapper with sample chips
-- `src/components/generate/BulkPreviewTable.tsx` — improved status badges
-- `src/components/generate/NomorCounter.tsx` — new design
-- `src/components/generate/SendEmailPanel.tsx` — chip placeholder toolbar
+- `api/pakta-admin.ts` — tambah get_template_upload_url; fix update_event action-field leak
+- `src/contexts/PaktaAdminContext.tsx` — PaktaAdminProvider + callAdmin (useCallback)
+- `src/components/AppRouter.tsx` — View union + navigate untuk pakta-admin/editor/dashboard
+- `src/components/editor/FieldProperties.tsx` — input tinggi untuk field tandaTangan
+- `src/components/pakta-admin/AdminLogin.tsx` — halaman login admin
+- `src/components/pakta-admin/NewPaktaEventModal.tsx` — modal buat acara (3-step upload)
+- `src/components/pakta-admin/PaktaEventList.tsx` — daftar acara dengan tombol aksi
+- `src/components/pakta-admin/ImportSignersModal.tsx` — impor CSV/Excel daftar pegawai
+- `src/components/pakta-admin/PaktaPalette.tsx` — palet field pakta
+- `src/components/pakta-admin/PaktaEditor.tsx` — editor template pakta (reuse EditorCanvas)
+- `src/components/pakta-admin/PaktaDashboard.tsx` — dashboard: QR code, tabel TTD, unduh PDF
+- `src/App.tsx` — wire PaktaAdminProvider + PaktaAdminRoot + semua pakta views
+- `src/vite-env.d.ts` — referensi type vite/client
+- `src/lib/paktaStore.ts` — fungsi publik: getAcaraPakta, listSigners, updateSignerDone
+- `tests/paktaAdmin.test.ts` — tes API admin
+- `tests/paktaStore.test.ts` — tes store publik
+- `package.json` / `package-lock.json` — tambah qrcode + @types/qrcode
 
 ### Commands Run
-- `npm install` (worktree needed deps)
-- `npm run build` — PASS
-- `npm run test` — PASS
+- `npm run build` — ✅ 0 errors (pre-existing chunk size warning, non-blocking)
+- `npm run test` — ✅ 61/61 tests pass (12 test files)
 
 ### Validation
-- Build: ✓ 0 TypeScript errors, Vite 4.00s
-- Lint: No lint script in project
-- Test: ✓ 38/38 passed
+- Build: ✅ PASS
+- Lint: TypeScript strict dicek via build (tsc -b 0 errors)
+- Test: ✅ 61/61 PASS
 
-### Known Issues
-- None blocking. The `Reveal` component (`src/components/Reveal.tsx`) is still imported in old paths but no longer used in redesigned components — can be cleaned up separately.
-- Editor layout is now `height: calc(100dvh - 54px)` full-screen; the old `apple-page-wide` class is no longer applied there.
+### Known Issues (minor, tidak blocking merge)
+- `ImportSignersModal.tsx`: `previewRows()` dipanggil 2x per render (minor inefficiency)
+- `PaktaDashboard.tsx`: `load()` race condition pada rapid refresh (low severity)
+- `NewPaktaEventModal.tsx`: extension dari filename bukan MIME type (minor)
+- `PaktaEventList.tsx`: auto-logout via string match pada error message (minor)
+- Pre-existing chunk size build warning
 
 ### Next Step
-- User should verify all 4 views manually: Home, Editor, Generate Satuan, Generate Massal
-- If approved: commit and push (`git add` specific files, `git commit`, `git push -u origin feat/ui-redesign-2026`)
-- Then open PR targeting `main`
+- Push branch dan buat PR ke main
+- Setelah merge: lanjut ke Rencana 4 (halaman publik signing `/#pakta/:id`)
+- Prerequisite Rencana 4: bucket `pakta-templates` harus PUBLIC di Supabase dashboard

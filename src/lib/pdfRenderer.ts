@@ -1,6 +1,6 @@
-import { PDFDocument, StandardFonts, rgb, type PDFFont } from 'pdf-lib';
+import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
-import type { CertEvent, Field, FieldValues } from '../types';
+import type { CertEvent, Field, FieldValues, PaktaTemplate } from '../types';
 import { getFontPath, type FontWeight } from './fontRegistry';
 
 /** A 1x1 transparent PNG data URL — handy default/test background. */
@@ -69,25 +69,25 @@ function alignedX(text: string, field: Field, font: PDFFont, size: number): numb
   return field.x;
 }
 
-/** Render one certificate to PDF bytes. `values` supplies dynamic field text. */
-export async function renderCertificate(
-  event: CertEvent,
-  values: FieldValues,
-): Promise<Uint8Array> {
-  const doc = await PDFDocument.create();
-  doc.registerFontkit(fontkit);
+/** Gambar latar (PNG/JPG data URL) memenuhi seluruh halaman. */
+async function drawBackground(
+  doc: PDFDocument,
+  page: PDFPage,
+  background: string,
+  width: number,
+  height: number,
+): Promise<void> {
+  const bytes = dataUrlToBytes(background);
+  const img = background.includes('image/png')
+    ? await doc.embedPng(bytes)
+    : await doc.embedJpg(bytes);
+  page.drawImage(img, { x: 0, y: 0, width, height });
+}
 
-  const page = doc.addPage([event.bgWidth, event.bgHeight]);
-
-  const bgBytes = dataUrlToBytes(event.background);
-  const img = event.background.includes('image/png')
-    ? await doc.embedPng(bgBytes)
-    : await doc.embedJpg(bgBytes);
-  page.drawImage(img, { x: 0, y: 0, width: event.bgWidth, height: event.bgHeight });
-
+/** Buat pengambil font dengan cache + fallback Helvetica untuk satu dokumen. */
+function makeFontGetter(doc: PDFDocument) {
   const fontCache = new Map<string, PDFFont>();
-
-  const getFont = async (family: string, weight: FontWeight): Promise<PDFFont> => {
+  return async (family: string, weight: FontWeight): Promise<PDFFont> => {
     const key = `${family}-${weight}`;
     if (!fontCache.has(key)) {
       try {
@@ -101,24 +101,91 @@ export async function renderCertificate(
     }
     return fontCache.get(key)!;
   };
+}
+
+/** Gambar satu field teks (perataan + penyusutan font + konversi koordinat top→baseline). */
+async function drawTextField(
+  page: PDFPage,
+  field: Field,
+  text: string,
+  getFont: (family: string, weight: FontWeight) => Promise<PDFFont>,
+  pageHeight: number,
+): Promise<void> {
+  const font = await getFont(field.fontFamily, field.fontWeight);
+  const size = fitFontSize(text, field, font);
+  // field.y = TOP kotak teks (Konva: origin kiri-atas, y ke bawah).
+  // pdf-lib drawText y = BASELINE (origin kiri-bawah, y ke atas).
+  const ascent = font.heightAtSize(size, { descender: false });
+  page.drawText(text, {
+    x: alignedX(text, field, font, size),
+    y: pageHeight - field.y - ascent,
+    size,
+    font,
+    color: hexToRgb(field.warna),
+  });
+}
+
+/**
+ * Render satu Pakta Integritas ke PDF.
+ * `values` mengisi field teks; `signaturePng` (data URL) disisipkan pada field
+ * bertipe 'tandaTangan'. Bila null, field tanda tangan dilewati.
+ */
+export async function renderPakta(
+  template: PaktaTemplate,
+  values: FieldValues,
+  signaturePng: string | null,
+): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  doc.registerFontkit(fontkit);
+
+  const page = doc.addPage([template.bgWidth, template.bgHeight]);
+  await drawBackground(doc, page, template.background, template.bgWidth, template.bgHeight);
+
+  const getFont = makeFontGetter(doc);
+
+  const hasTandaTangan = template.fields.some(f => f.tipe === 'tandaTangan');
+  const sigImage = (signaturePng && hasTandaTangan)
+    ? await doc.embedPng(dataUrlToBytes(signaturePng))
+    : null;
+
+  for (const field of template.fields) {
+    if (field.tipe === 'tandaTangan') {
+      if (!sigImage) continue;
+      const h = field.tinggi ?? field.lebar / 2;
+      // field.y = TOP kotak; konversi ke origin bawah pdf-lib.
+      page.drawImage(sigImage, {
+        x: field.x,
+        y: template.bgHeight - field.y - h,
+        width: field.lebar,
+        height: h,
+      });
+      continue;
+    }
+    const text = (values[field.tipe] ?? '').toString();
+    if (!text) continue;
+    await drawTextField(page, field, text, getFont, template.bgHeight);
+  }
+
+  return doc.save();
+}
+
+/** Render one certificate to PDF bytes. `values` supplies dynamic field text. */
+export async function renderCertificate(
+  event: CertEvent,
+  values: FieldValues,
+): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  doc.registerFontkit(fontkit);
+
+  const page = doc.addPage([event.bgWidth, event.bgHeight]);
+  await drawBackground(doc, page, event.background, event.bgWidth, event.bgHeight);
+
+  const getFont = makeFontGetter(doc);
 
   for (const field of event.fields) {
     const text = (values[field.tipe] ?? '').toString();
     if (!text) continue;
-
-    const font = await getFont(field.fontFamily, field.fontWeight);
-    const size = fitFontSize(text, field, font);
-    // field.y is the TOP of the text box (Konva origin: top-left, y grows down).
-    // pdf-lib drawText y is the BASELINE (origin: bottom-left, y grows up).
-    // Subtract ascent so the visual top of the PDF text aligns with field.y.
-    const ascent = font.heightAtSize(size, { descender: false });
-    page.drawText(text, {
-      x: alignedX(text, field, font, size),
-      y: event.bgHeight - field.y - ascent,
-      size,
-      font,
-      color: hexToRgb(field.warna),
-    });
+    await drawTextField(page, field, text, getFont, event.bgHeight);
   }
 
   return doc.save();

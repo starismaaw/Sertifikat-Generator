@@ -128,6 +128,18 @@ function FieldTab({
             />
           </div>
         </div>
+        {selected.tipe === 'tandaTangan' && (
+          <div className="sg-form-group">
+            <label className="sg-label">Tinggi tanda tangan (px)</label>
+            <input
+              className="sg-input"
+              type="number"
+              min="10"
+              value={selected.tinggi ?? Math.round(selected.lebar / 2)}
+              onChange={e => onField({ tinggi: safeNum(e.target.value, selected.lebar / 2) })}
+            />
+          </div>
+        )}
       </div>
 
       <div className="sg-event-divider" style={{ margin: '12px 0' }} />

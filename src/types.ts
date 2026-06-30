@@ -7,7 +7,10 @@ export type FieldTipe =
   | 'tanggal'
   | 'peran'
   | 'penandatangan'
-  | 'namaPenandatangan';
+  | 'namaPenandatangan'
+  | 'nip'
+  | 'jabatan'
+  | 'tandaTangan';
 
 export type Perataan = 'left' | 'center' | 'right';
 
@@ -23,6 +26,8 @@ export interface Field {
   warna: string;    // hex, e.g. '#000000'
   perataan: Perataan;
   formatter: 'none' | 'uppercase';
+  /** Tinggi kotak (px natural). Hanya dipakai field tipe 'tandaTangan'. */
+  tinggi?: number;
 }
 
 export interface Penandatangan {
@@ -47,3 +52,11 @@ export interface CertEvent {
 
 /** Resolved string values for one certificate, keyed by field tipe. */
 export type FieldValues = Partial<Record<FieldTipe, string>>;
+
+/** Template Pakta minimal untuk rendering (tanpa ketergantungan tipe backend). */
+export interface PaktaTemplate {
+  background: string;   // data URL
+  bgWidth: number;      // lebar natural px
+  bgHeight: number;     // tinggi natural px
+  fields: Field[];
+}
