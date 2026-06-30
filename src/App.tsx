@@ -6,6 +6,7 @@ import { CertificateEditor } from './components/editor/CertificateEditor';
 import { GenerateView } from './components/generate/GenerateView';
 import { AppTopbar, type BreadcrumbItem, type SaveState } from './components/AppTopbar';
 import { getEvent } from './lib/eventStore';
+import { PaktaDashboard } from './components/pakta-admin/PaktaDashboard';
 
 export default function App() {
   const view = useView();
@@ -52,7 +53,7 @@ export default function App() {
       {view.name === 'generate' && <GenerateView key={view.eventId} eventId={view.eventId} />}
       {view.name === 'pakta-admin' && <div>Pakta Admin View</div>}
       {view.name === 'pakta-editor' && <div>Pakta Editor View - {view.eventId}</div>}
-      {view.name === 'pakta-dashboard' && <div>Pakta Dashboard View - {view.eventId}</div>}
+      {view.name === 'pakta-dashboard' && <PaktaDashboard key={view.eventId} eventId={view.eventId} />}
     </div>
   );
 }
