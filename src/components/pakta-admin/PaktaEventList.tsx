@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { usePaktaAdmin } from '../../contexts/PaktaAdminContext';
 import { navigate } from '../AppRouter';
 import { NewPaktaEventModal } from './NewPaktaEventModal';
+import { ImportSignersModal } from './ImportSignersModal';
 
 interface PaktaEvent {
   id: string;
@@ -21,6 +22,7 @@ function PlusIcon() {
 
 function PaktaCard({ event, onReload }: { event: PaktaEvent; onReload: () => void }) {
   const { callAdmin } = usePaktaAdmin();
+  const [showImport, setShowImport] = useState(false);
 
   async function toggleStatus() {
     const next = event.status === 'aktif' ? 'ditutup' : 'aktif';
@@ -33,37 +35,51 @@ function PaktaCard({ event, onReload }: { event: PaktaEvent; onReload: () => voi
   }
 
   return (
-    <article className="apple-card" style={{ marginBottom: 12 }}>
-      <div className="apple-card-body" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 2 }}>{event.nama}</div>
-          <div className="apple-caption" style={{ color: 'var(--color-ink-muted)' }}>
-            {event.tanggal}
-            {' · '}
-            <span className={`apple-badge ${event.status === 'aktif' ? 'apple-badge-ok' : 'apple-badge-warn'}`}>
-              {event.status === 'aktif' ? 'Aktif' : 'Ditutup'}
-            </span>
+    <>
+      <article className="apple-card" style={{ marginBottom: 12 }}>
+        <div className="apple-card-body" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 2 }}>{event.nama}</div>
+            <div className="apple-caption" style={{ color: 'var(--color-ink-muted)' }}>
+              {event.tanggal}
+              {' · '}
+              <span className={`apple-badge ${event.status === 'aktif' ? 'apple-badge-ok' : 'apple-badge-warn'}`}>
+                {event.status === 'aktif' ? 'Aktif' : 'Ditutup'}
+              </span>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              className="sg-btn sg-btn-outline"
+              onClick={() => navigate({ name: 'pakta-editor', eventId: event.id })}
+            >
+              Edit Templat
+            </button>
+            <button
+              className="sg-btn sg-btn-outline"
+              onClick={() => setShowImport(true)}
+            >
+              Import Peserta
+            </button>
+            <button
+              className="sg-btn sg-btn-primary"
+              onClick={() => navigate({ name: 'pakta-dashboard', eventId: event.id })}
+            >
+              Dashboard
+            </button>
+            <button className="sg-btn sg-btn-outline" onClick={toggleStatus}>
+              {event.status === 'aktif' ? 'Tutup' : 'Buka'}
+            </button>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            className="sg-btn sg-btn-outline"
-            onClick={() => navigate({ name: 'pakta-editor', eventId: event.id })}
-          >
-            Edit Templat
-          </button>
-          <button
-            className="sg-btn sg-btn-primary"
-            onClick={() => navigate({ name: 'pakta-dashboard', eventId: event.id })}
-          >
-            Dashboard
-          </button>
-          <button className="sg-btn sg-btn-outline" onClick={toggleStatus}>
-            {event.status === 'aktif' ? 'Tutup' : 'Buka'}
-          </button>
-        </div>
-      </div>
-    </article>
+      </article>
+      {showImport && (
+        <ImportSignersModal
+          eventId={event.id}
+          onClose={() => { setShowImport(false); onReload(); }}
+        />
+      )}
+    </>
   );
 }
 
