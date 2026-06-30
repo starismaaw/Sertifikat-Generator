@@ -31,7 +31,7 @@ export function PaktaDashboard({ eventId }: { eventId: string }) {
   const [showImport, setShowImport] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
-  const publicUrl = `${window.location.origin}${window.location.pathname}#pakta/${eventId}`;
+  const publicUrl = `${window.location.origin}/#pakta/${eventId}`;
 
   async function load() {
     setLoading(true);
