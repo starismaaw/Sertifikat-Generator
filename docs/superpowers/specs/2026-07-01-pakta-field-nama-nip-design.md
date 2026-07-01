@@ -16,7 +16,7 @@ pegawai sebagai satu blok tunggal dengan format baku dokumen resmi:
 ```
      Nama Pegawai
      ‾‾‾‾‾‾‾‾‾‾‾‾‾ (garis bawah, pas selebar teks nama)
-NIP. XXXXXXXXXXXXXXXXXXX
+NIP. XXXXXXXXXXXXXXXXXX
 ```
 
 Saat ini format ini harus disusun manual dari dua field terpisah (`nama` + `nip`)
@@ -94,7 +94,7 @@ yang mudah tidak sejajar dan tidak punya garis bawah maupun prefiks "NIP. ".
 
 - Field `namaNip` dirender sebagai **satu Konva Group** berisi 2 `Text` anak:
   - Baris 1: placeholder `"Nama Pegawai"`, `textDecoration="underline"`.
-  - Baris 2: placeholder `"NIP. XXXXXXXXXXXXXXXXXXX"` (18 karakter `X`, sesuai
+  - Baris 2: placeholder `"NIP. XXXXXXXXXXXXXXXXXX"` (18 karakter `X`, sesuai
     panjang format NIP PNS Indonesia).
 - **Group itu sendiri yang `draggable`** (bukan `Text` individual seperti field
   lain) — sehingga admin menggeser satu blok dan kedua baris ikut bergerak
