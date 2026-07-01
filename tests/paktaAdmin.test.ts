@@ -196,4 +196,72 @@ describe('pakta-admin handler', () => {
     await handler(mockReq({ action: 'delete_event' }), res);
     expect(res.statusCode).toBe(400);
   });
+
+  // WHY: reset tanda tangan harus menghapus PDF lama dari storage lalu
+  // mengembalikan status peserta ke 'belum' supaya bisa TTD ulang.
+  it('reset_signer menghapus PDF storage lalu reset status ke belum', async () => {
+    const removeMock = vi.fn().mockResolvedValue({ error: null });
+    const storageFromMock = vi.fn().mockReturnValue({ remove: removeMock });
+
+    fromAdminMock
+      .mockReturnValueOnce({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({ data: { pdf_path: 'docs/ev1/s1.pdf' }, error: null }),
+          }),
+        }),
+      })
+      .mockReturnValueOnce({
+        update: vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({ error: null }),
+        }),
+      });
+
+    createClientMock.mockReturnValue({ from: fromAdminMock, storage: { from: storageFromMock } });
+
+    const res = mockRes();
+    await handler(mockReq({ action: 'reset_signer', id: 's1' }), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(storageFromMock).toHaveBeenCalledWith('pakta-documents');
+    expect(removeMock).toHaveBeenCalledWith(['docs/ev1/s1.pdf']);
+  });
+
+  // WHY: kalau peserta belum pernah punya PDF (belum TTD), tidak boleh ada
+  // panggilan hapus storage yang sia-sia.
+  it('reset_signer tidak memanggil storage remove kalau belum ada pdf_path', async () => {
+    const removeMock = vi.fn().mockResolvedValue({ error: null });
+    const storageFromMock = vi.fn().mockReturnValue({ remove: removeMock });
+
+    fromAdminMock
+      .mockReturnValueOnce({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({ data: { pdf_path: null }, error: null }),
+          }),
+        }),
+      })
+      .mockReturnValueOnce({
+        update: vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({ error: null }),
+        }),
+      });
+
+    createClientMock.mockReturnValue({ from: fromAdminMock, storage: { from: storageFromMock } });
+
+    const res = mockRes();
+    await handler(mockReq({ action: 'reset_signer', id: 's2' }), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(removeMock).not.toHaveBeenCalled();
+  });
+
+  // WHY: id peserta wajib diisi agar tidak mereset tanpa target.
+  it('reset_signer menolak bila id tidak ada', async () => {
+    fromAdminMock.mockReturnValue({});
+    const res = mockRes();
+    await handler(mockReq({ action: 'reset_signer' }), res);
+    expect(res.statusCode).toBe(400);
+  });
 });
