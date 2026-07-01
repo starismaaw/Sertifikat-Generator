@@ -44,6 +44,23 @@ function GridIcon() {
   );
 }
 
+function FieldsIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+      <path d="M2 4h11M2 7.5h11M2 11h11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function PropertiesIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+      <circle cx="7.5" cy="7.5" r="2.2" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M7.5 1.5v2M7.5 11v2M1.5 7.5h2M11 7.5h2M3.4 3.4l1.4 1.4M9.7 9.7l1.4 1.4M3.4 11.6l1.4-1.4M9.7 5.3l1.4-1.4" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function CertificateEditor({ eventId }: { eventId: string }) {
   const { save } = useEvents();
   const [event, setEvent] = useState<CertEvent | undefined>(() => getEvent(eventId));
@@ -51,6 +68,8 @@ export function CertificateEditor({ eventId }: { eventId: string }) {
   const [showGrid, setShowGrid] = useState(false);
   const [toastKey, setToastKey] = useState(0);
   const [showToast, setShowToast] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [propertiesOpen, setPropertiesOpen] = useState(false);
 
   const triggerToast = useCallback(() => {
     setToastKey(k => k + 1);
@@ -80,6 +99,13 @@ export function CertificateEditor({ eventId }: { eventId: string }) {
     const f = newField(tipe, event);
     update({ ...event, fields: [...event.fields, f] });
     setSelectedId(f.id);
+    setPaletteOpen(false);
+    setPropertiesOpen(true);
+  };
+
+  const selectField = (id: string | null) => {
+    setSelectedId(id);
+    if (id) setPropertiesOpen(true);
   };
 
   const moveField = (id: string, x: number, y: number) => {
@@ -108,23 +134,34 @@ export function CertificateEditor({ eventId }: { eventId: string }) {
 
   return (
     <div className="sg-editor-layout">
-      {/* Left palette */}
-      <FieldPalette onAdd={addField} used={used} />
+      {/* Left palette (drawer di mobile) */}
+      <div className={`sg-palette-drawer ${paletteOpen ? 'open' : ''}`}>
+        <FieldPalette onAdd={addField} used={used} />
+      </div>
 
       {/* Canvas area */}
       <div className="sg-editor-canvas-wrap">
         {/* Toolbar */}
         <div className="sg-editor-toolbar">
-          <button className="sg-toolbar-btn" title="Urungkan (tidak tersedia)">
+          <button
+            className="sg-toolbar-btn sg-mobile-toggle-btn"
+            title="Daftar field"
+            aria-label="Tampilkan daftar field"
+            onClick={() => { setPaletteOpen(o => !o); setPropertiesOpen(false); }}
+          >
+            <FieldsIcon />
+          </button>
+          <button className="sg-toolbar-btn" title="Urungkan (tidak tersedia)" aria-label="Urungkan (belum tersedia)">
             <UndoIcon />
           </button>
-          <button className="sg-toolbar-btn" title="Ulangi (tidak tersedia)">
+          <button className="sg-toolbar-btn" title="Ulangi (tidak tersedia)" aria-label="Ulangi (belum tersedia)">
             <RedoIcon />
           </button>
           <div className="sg-editor-toolbar-divider" />
           <button
             className={`sg-toolbar-btn ${showGrid ? 'active' : ''}`}
             title="Toggle grid"
+            aria-label="Tampilkan/sembunyikan grid"
             onClick={() => setShowGrid(g => !g)}
           >
             <GridIcon />
@@ -134,6 +171,14 @@ export function CertificateEditor({ eventId }: { eventId: string }) {
             <span style={{ color: 'var(--color-hairline)' }}>·</span>
             <span>{event.bgWidth}×{event.bgHeight}</span>
             <div className="sg-editor-toolbar-divider" />
+            <button
+              className="sg-toolbar-btn sg-mobile-toggle-btn"
+              title="Properti field"
+              aria-label="Tampilkan properti field"
+              onClick={() => { setPropertiesOpen(o => !o); setPaletteOpen(false); }}
+            >
+              <PropertiesIcon />
+            </button>
             <button
               className="sg-btn sg-btn-primary"
               style={{ fontSize: 12, padding: '5px 12px', borderRadius: 6 }}
@@ -149,7 +194,7 @@ export function CertificateEditor({ eventId }: { eventId: string }) {
           <EditorCanvas
             event={event}
             selectedId={selectedId}
-            onSelect={setSelectedId}
+            onSelect={selectField}
             onMove={moveField}
             showGrid={showGrid}
           />
@@ -159,13 +204,21 @@ export function CertificateEditor({ eventId }: { eventId: string }) {
         </div>
       </div>
 
-      {/* Right properties */}
-      <FieldProperties
-        event={event}
-        selected={selected}
-        onField={patchField}
-        onEvent={patchEvent}
-        onDelete={deleteField}
+      {/* Right properties (bottom sheet di mobile) */}
+      <div className={`sg-properties-drawer ${propertiesOpen ? 'open' : ''}`}>
+        <FieldProperties
+          event={event}
+          selected={selected}
+          onField={patchField}
+          onEvent={patchEvent}
+          onDelete={deleteField}
+        />
+      </div>
+
+      {/* Backdrop mobile untuk drawer/sheet */}
+      <div
+        className={`sg-editor-backdrop ${paletteOpen || propertiesOpen ? 'open' : ''}`}
+        onClick={() => { setPaletteOpen(false); setPropertiesOpen(false); }}
       />
 
       {/* Auto-save toast */}

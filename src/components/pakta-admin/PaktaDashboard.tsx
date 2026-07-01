@@ -93,12 +93,12 @@ export function PaktaDashboard({ eventId }: { eventId: string }) {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 220px', gap: 24, alignItems: 'start' }}>
+      <div className="sg-pakta-dashboard-grid">
         {/* Kolom kiri: statistik + tabel */}
         <div>
           {/* Statistik */}
           <div className="apple-card" style={{ marginBottom: 16 }}>
-            <div className="apple-card-body" style={{ display: 'flex', gap: 32 }}>
+            <div className="apple-card-body sg-pakta-stats-row">
               <div>
                 <div style={{ fontSize: 36, fontWeight: 700 }}>{sudahCount}/{totalCount}</div>
                 <div className="apple-caption">Sudah menandatangani</div>

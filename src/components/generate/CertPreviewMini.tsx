@@ -1,7 +1,25 @@
-import { useState, useEffect, Fragment } from 'react';
+import { useState, useEffect, useRef, Fragment } from 'react';
 import { Stage, Layer, Image as KImage, Text } from 'react-konva';
 import type { CertEvent } from '../../types';
 import { resolveValues } from '../../lib/resolveValues';
+
+function useContainerWidth(): [React.RefObject<HTMLDivElement>, number] {
+  const ref = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(380);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new ResizeObserver(entries => {
+      const w = entries[0]?.contentRect.width;
+      if (w) setWidth(w);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return [ref, width];
+}
 
 function konvaFontStyle(weight: string): string {
   switch (weight) {
@@ -34,7 +52,8 @@ export function CertPreviewMini({
   previewN: number;
 }) {
   const img = useHtmlImage(event.background);
-  const MAX_W = 380;
+  const [containerRef, containerWidth] = useContainerWidth();
+  const MAX_W = Math.min(380, containerWidth);
   const scale = Math.min(1, MAX_W / event.bgWidth);
   const canvasW = event.bgWidth * scale;
   const canvasH = event.bgHeight * scale;
@@ -44,13 +63,13 @@ export function CertPreviewMini({
   return (
     <div>
       <div className="sg-section-eyebrow" style={{ marginBottom: 8 }}>Pratinjau Langsung</div>
-      <div style={{
+      <div ref={containerRef} style={{
         background: '#fff',
         border: '1px solid var(--color-hairline)',
         borderRadius: 10,
         overflow: 'hidden',
         boxShadow: 'var(--shadow-soft)',
-        display: 'inline-block',
+        display: 'block',
         width: '100%',
       }}>
         <Stage width={canvasW} height={canvasH} style={{ display: 'block' }}>

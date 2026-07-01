@@ -7,6 +7,23 @@ import { AutoSaveToast } from '../AutoSaveToast';
 import { navigate } from '../AppRouter';
 import { usePaktaAdmin } from '../../contexts/PaktaAdminContext';
 
+function FieldsIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+      <path d="M2 4h11M2 7.5h11M2 11h11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function PropertiesIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+      <circle cx="7.5" cy="7.5" r="2.2" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M7.5 1.5v2M7.5 11v2M1.5 7.5h2M11 7.5h2M3.4 3.4l1.4 1.4M9.7 9.7l1.4 1.4M3.4 11.6l1.4-1.4M9.7 5.3l1.4-1.4" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 interface PaktaState {
   eventId: string;
   nama: string;
@@ -67,6 +84,8 @@ export function PaktaEditor({ eventId }: { eventId: string }) {
   const [toastKey, setToastKey] = useState(0);
   const [showToast, setShowToast] = useState(false);
   const [error, setError] = useState('');
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [propertiesOpen, setPropertiesOpen] = useState(false);
 
   const triggerToast = useCallback(() => {
     setToastKey(k => k + 1);
@@ -129,6 +148,13 @@ export function PaktaEditor({ eventId }: { eventId: string }) {
     setState(next);
     save(next);
     setSelectedId(f.id);
+    setPaletteOpen(false);
+    setPropertiesOpen(true);
+  }
+
+  function selectField(id: string | null) {
+    setSelectedId(id);
+    if (id) setPropertiesOpen(true);
   }
 
   function updateField(id: string, patch: Partial<Field>) {
@@ -148,8 +174,8 @@ export function PaktaEditor({ eventId }: { eventId: string }) {
 
   return (
     <div className="sg-editor-layout">
-      {/* Sidebar kiri: palet */}
-      <aside className="sg-editor-sidebar">
+      {/* Sidebar kiri: palet (drawer di mobile) */}
+      <aside className={`sg-editor-sidebar ${paletteOpen ? 'open' : ''}`}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <button className="sg-btn sg-btn-outline" style={{ fontSize: 12 }} onClick={() => navigate({ name: 'pakta-admin' })}>
             ← Kembali
@@ -166,26 +192,44 @@ export function PaktaEditor({ eventId }: { eventId: string }) {
       <main className="sg-editor-main">
         <div className="sg-editor-toolbar">
           <button
+            className="sg-btn sg-btn-icon sg-mobile-toggle-btn"
+            onClick={() => { setPaletteOpen(o => !o); setPropertiesOpen(false); }}
+            title="Daftar field"
+            aria-label="Tampilkan daftar field"
+          >
+            <FieldsIcon />
+          </button>
+          <button
             className={`sg-btn sg-btn-icon ${showGrid ? 'active' : ''}`}
             onClick={() => setShowGrid(g => !g)}
             title="Grid"
+            aria-label="Tampilkan/sembunyikan grid"
           >
             <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
               <path d="M1 5h13M1 10h13M5 1v13M10 1v13" stroke="currentColor" strokeWidth="1.2" />
             </svg>
           </button>
+          <button
+            className="sg-btn sg-btn-icon sg-mobile-toggle-btn"
+            style={{ marginLeft: 'auto' }}
+            onClick={() => { setPropertiesOpen(o => !o); setPaletteOpen(false); }}
+            title="Properti field"
+            aria-label="Tampilkan properti field"
+          >
+            <PropertiesIcon />
+          </button>
         </div>
         <EditorCanvas
           event={fakeCertEvent}
           selectedId={selectedId}
-          onSelect={setSelectedId}
+          onSelect={selectField}
           onMove={(id, x, y) => updateField(id, { x, y })}
           showGrid={showGrid}
         />
       </main>
 
-      {/* Sidebar kanan: properties */}
-      <aside className="sg-editor-sidebar-right">
+      {/* Sidebar kanan: properties (bottom sheet di mobile) */}
+      <aside className={`sg-editor-sidebar-right ${propertiesOpen ? 'open' : ''}`}>
         <FieldProperties
           event={fakeCertEvent}
           selected={selectedField}
@@ -194,6 +238,12 @@ export function PaktaEditor({ eventId }: { eventId: string }) {
           onDelete={() => selectedId && deleteField(selectedId)}
         />
       </aside>
+
+      {/* Backdrop mobile untuk drawer/sheet */}
+      <div
+        className={`sg-editor-backdrop ${paletteOpen || propertiesOpen ? 'open' : ''}`}
+        onClick={() => { setPaletteOpen(false); setPropertiesOpen(false); }}
+      />
 
       <AutoSaveToast key={toastKey} visible={showToast} />
     </div>

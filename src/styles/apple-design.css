@@ -108,6 +108,12 @@ body {
   background: var(--color-canvas-soft);
 }
 
+/* Reset flexbox auto-minimum-size: tanpa ini, konten anak yang lebar
+   (mis. kanvas Konva) memaksa halaman melebar melebihi viewport di mobile. */
+.apple-app > * {
+  min-width: 0;
+}
+
 .apple-nav {
   position: sticky;
   top: 0;
@@ -401,6 +407,13 @@ body {
 .apple-btn-lg {
   padding: 11px 22px;
   font-size: 17px;
+}
+
+@media (max-width: 480px) {
+  .apple-btn-sm,
+  .apple-btn-secondary {
+    min-height: 44px;
+  }
 }
 
 /* Segmented Control (tabs) */
@@ -1054,9 +1067,17 @@ body {
   justify-content: center;
 }
 
+@media (max-width: 600px) {
+  .sg-topbar-org,
+  .sg-topbar-divider {
+    display: none;
+  }
+}
+
 /* ── Home EventList ─────────────────────────────────────────── */
 
 .sg-home {
+  width: 100%;
   max-width: 1180px;
   margin: 0 auto;
   padding: 40px 24px;
@@ -1114,6 +1135,16 @@ body {
 
 .sg-search input::placeholder {
   color: var(--color-ink-faint);
+}
+
+@media (max-width: 640px) {
+  .sg-home-actions {
+    flex-wrap: wrap;
+  }
+  .sg-search {
+    width: 100%;
+    order: -1;
+  }
 }
 
 /* Empty state */
@@ -1581,6 +1612,15 @@ body {
   object-fit: cover;
 }
 
+@media (max-width: 600px) {
+  .sg-upload-row {
+    flex-direction: column;
+  }
+  .sg-upload-preview {
+    width: 100%;
+  }
+}
+
 .sg-upload-zone {
   flex: 1;
   border: 2px dashed rgba(0,117,222,0.4);
@@ -1813,6 +1853,102 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+/* PaktaEditor.tsx pakai nama class ini untuk kolom yang sama — samakan box-model
+   dengan .sg-field-palette/.sg-editor-canvas-wrap/.sg-properties-panel tanpa
+   duplikasi padding/background (anak sudah menyediakan itu sendiri). */
+.sg-editor-sidebar {
+  width: 212px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 12px 14px 0;
+}
+
+.sg-editor-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-canvas-soft);
+}
+
+.sg-editor-sidebar-right {
+  width: 288px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+/* ── Editor mobile: drawer kiri + bottom sheet kanan ─────────── */
+
+.sg-mobile-toggle-btn {
+  display: none;
+}
+
+.sg-editor-backdrop {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .sg-mobile-toggle-btn {
+    display: flex;
+  }
+
+  .sg-editor-backdrop.open {
+    display: block;
+    position: fixed;
+    inset: 54px 0 0 0;
+    background: rgba(20,20,18,0.4);
+    z-index: 240;
+    animation: sg-fade-in 0.15s ease;
+  }
+
+  .sg-palette-drawer .sg-field-palette,
+  .sg-editor-sidebar {
+    position: fixed;
+    top: 54px;
+    left: 0;
+    bottom: 0;
+    width: min(80vw, 320px);
+    z-index: 250;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+    box-shadow: var(--shadow-elevated);
+  }
+
+  .sg-palette-drawer.open .sg-field-palette,
+  .sg-editor-sidebar.open {
+    transform: translateX(0);
+  }
+
+  .sg-properties-drawer .sg-properties-panel,
+  .sg-editor-sidebar-right {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    width: 100%;
+    max-height: 75vh;
+    z-index: 250;
+    border-left: none;
+    border-top: 1px solid var(--color-hairline);
+    border-radius: 16px 16px 0 0;
+    transform: translateY(100%);
+    transition: transform 0.2s ease;
+    box-shadow: var(--shadow-elevated);
+  }
+
+  .sg-properties-drawer.open .sg-properties-panel,
+  .sg-editor-sidebar-right.open {
+    transform: translateY(0);
+  }
+
+  .sg-canvas-area {
+    padding: 12px;
+  }
 }
 
 .sg-tab-bar {
@@ -2116,12 +2252,34 @@ body {
   background: var(--color-primary);
 }
 
+@media (max-width: 600px) {
+  .sg-stepper {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .sg-step-label {
+    white-space: normal;
+    font-size: 11px;
+  }
+  .sg-step-connector {
+    min-width: 12px;
+    margin: 0 4px;
+  }
+}
+
 /* ── Generate view layout ──────────────────────────────────── */
 
 .sg-generate-page {
+  width: 100%;
   max-width: 900px;
   margin: 0 auto;
   padding: 34px 40px;
+}
+
+@media (max-width: 600px) {
+  .sg-generate-page {
+    padding: 20px 16px;
+  }
 }
 
 .sg-generate-header {
@@ -2201,6 +2359,14 @@ body {
   color: var(--color-primary);
 }
 
+@media (max-width: 600px) {
+  .sg-nomor-counter {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+  }
+}
+
 /* ── Column Mapper Visual ───────────────────────────────────── */
 
 .sg-mapper-row {
@@ -2209,6 +2375,16 @@ body {
   align-items: center;
   gap: 12px;
   margin-bottom: 12px;
+}
+
+@media (max-width: 480px) {
+  .sg-mapper-row {
+    grid-template-columns: 1fr;
+    justify-items: start;
+  }
+  .sg-mapper-arrow {
+    transform: rotate(90deg);
+  }
 }
 
 .sg-mapper-field-chip {
@@ -2423,6 +2599,10 @@ body {
   gap: 24px;
 }
 
+.sg-two-col > * {
+  min-width: 0;
+}
+
 @media (max-width: 720px) {
   .sg-two-col { grid-template-columns: 1fr; }
 }
@@ -2434,4 +2614,31 @@ body {
   letter-spacing: 0.5px;
   color: var(--color-ink-faint);
   margin-bottom: 12px;
+}
+
+/* ── Pakta Dashboard ─────────────────────────────────────────── */
+
+.sg-pakta-dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 220px;
+  gap: 24px;
+  align-items: start;
+}
+
+.sg-pakta-stats-row {
+  display: flex;
+  gap: 32px;
+}
+
+@media (max-width: 768px) {
+  .sg-pakta-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .sg-pakta-stats-row {
+    flex-wrap: wrap;
+    gap: 20px;
+  }
 }
