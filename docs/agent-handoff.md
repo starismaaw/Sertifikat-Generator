@@ -1,60 +1,66 @@
 ## Agent Handoff
 
 **Branch:** `claude/quizzical-elbakyan-b7f94e`
-**Task:** Progress bertahap saat "Kirim Tanda Tangan" (bukan teks statis) + tombol unduh PDF di halaman sukses, di halaman publik pakta integritas
+**Task:** Reset tanda tangan (supaya peserta bisa TTD ulang) + search nama/NIP di dashboard admin acara pakta integritas
 **Last agent:** Claude Sonnet 5 (Claude Code), via brainstorming → writing-plans → subagent-driven-development
-**Status:** COMPLETE (Task 1+2, Task 3 dari plan selesai + review bersih) — build ✅, test 83/83 ✅, review akhir Opus: "Ready to merge: Yes". Menunggu approval user untuk push/PR/merge.
+**Status:** COMPLETE (Task 1-4 dari plan selesai + review bersih) — build ✅, test 86/86 ✅, review akhir Opus: "Ready to merge: Yes". Menunggu approval user untuk push/PR/merge.
 
 ### Catatan penting soal branch ini
 
 Branch `claude/quizzical-elbakyan-b7f94e` sudah dipakai berulang kali di worktree ini untuk fitur-fitur berbeda, masing-masing sudah di-PR-kan dan di-merge terpisah:
 - SemiBold font weight → [PR #23](https://github.com/starismaaw/Sertifikat-Generator/pull/23), merged.
 - Perbaikan daftar nama halaman link tanda tangan (search, layout, scroll) → [PR #24](https://github.com/starismaaw/Sertifikat-Generator/pull/24), merged.
-- Fitur di handoff ini (progress submit + unduh PDF) → **belum di-PR-kan**, ini yang perlu di-PR berikutnya.
+- Progress bertahap submit + unduh PDF halaman sukses → [PR #25](https://github.com/starismaaw/Sertifikat-Generator/pull/25), merged.
+- Fitur di handoff ini (reset tanda tangan + search dashboard admin) → **belum di-PR-kan**, ini yang perlu di-PR berikutnya.
 
-Base yang benar untuk fitur ini adalah `origin/main` di commit `2524829` (tip main setelah PR #24 merge). Local `main` ref di worktree ini masih TIDAK up to date dengan `origin/main` — selalu `git fetch origin` dulu sebelum menghitung `git merge-base` untuk fitur berikutnya di branch ini.
+Base yang benar untuk fitur ini adalah `origin/main` di commit `f3ecb54` (tip main setelah PR #25 merge). Local `main` ref di worktree ini masih TIDAK up to date dengan `origin/main` — selalu `git fetch origin` dulu sebelum menghitung `git merge-base` untuk fitur berikutnya di branch ini.
 
 ### Referensi
-- Spec: `docs/superpowers/specs/2026-07-01-pakta-signer-submit-progress-download-design.md`
-- Plan: `docs/superpowers/plans/2026-07-01-pakta-signer-submit-progress-download.md`
+- Spec: `docs/superpowers/specs/2026-07-02-pakta-dashboard-reset-search-design.md`
+- Plan: `docs/superpowers/plans/2026-07-02-pakta-dashboard-reset-search.md`
 
 ### Latar Belakang
-User melaporkan loading "Mengirim tanda tangan…" (setelah klik submit di halaman publik `/#pakta/<eventId>`) terlihat plain dan seperti macet — padahal `handleSubmit` melalui 4 langkah async nyata (minta URL unggah, render PDF di browser, unggah ke storage, simpan status). User juga minta tombol unduh PDF di halaman sukses.
+Dashboard admin (`PaktaDashboard.tsx`) tidak punya cara untuk membatalkan tanda tangan seorang peserta (mis. salah TTD, perlu revisi) supaya bisa TTD ulang, dan tidak punya fitur cari untuk acara dengan banyak peserta.
 
 ### Ringkasan Perubahan
-- `src/components/pakta-signer/PaktaSignPage.tsx` — satu-satunya file yang diubah:
-  - State `submitPhase: 'preparing' | 'rendering' | 'uploading' | 'saving'`, di-set tepat sebelum tiap langkah async nyata di `handleSubmit`, di-reset ke `'preparing'` di awal supaya retry setelah error mulai dari awal lagi.
-  - Render step `submitting` diganti dari teks statis jadi progress bar indeterminate + label tahap yang berganti, reuse class `.apple-progress`/`.apple-progress-phase`/`.apple-progress-track`/`.apple-progress-fill.indeterminate` yang sudah ada (dipakai di alur generate massal sertifikat) — tidak ada CSS baru.
-  - Tipe varian `success` di `PageState` diperluas dengan `pdfBytes: Uint8Array`, diisi dari `pdfBytes` yang sama yang sudah dihasilkan `renderPakta()` sebelum diunggah (bukan render ulang).
-  - Fungsi baru `downloadSuccessPdf` — bungkus `pdfBytes` jadi `Blob` + object URL lokal, trigger unduhan lewat `<a>` sintetis, nama file `pakta-${nama.replace(/\s+/g, '_')}.pdf` (identik dengan konvensi admin di `PaktaDashboard.tsx`). Tidak ada API baru — instan karena bytes sudah di memori.
-  - Tombol "Unduh PDF" ditambah di render step `success`.
-- Batasan yang disengaja: `pdfBytes` hanya ada di memori selama sesi halaman berlangsung — refresh setelah sukses akan mengarahkan ke `pickName` (nama sudah `sudah`), tidak balik ke tombol unduh. Tidak ada endpoint baru untuk kasus unduh-ulang.
+- `api/pakta-admin.ts` — action baru `reset_signer`: hapus PDF lama dari storage bucket `pakta-documents` (kalau ada), lalu update baris signer jadi `status: 'belum', signed_at: null, pdf_path: null`. Terlindungi otomatis oleh `verifyPassword` gate yang sudah ada sebelum switch action (tidak ada logic auth baru ditambahkan, dan final review mengonfirmasi gate ini tidak ter-bypass).
+- `src/components/pakta-admin/PaktaDashboard.tsx`:
+  - Fungsi `resetSigner` — `window.confirm` sebelum aksi, panggil `callAdmin('reset_signer', { id })`, lalu `load()` untuk refresh tabel.
+  - Tombol "Reset" di kolom Unduh, berdampingan dengan tombol "PDF", keduanya di dalam kondisi `s.pdf_path ?` (setara dengan status "sudah" — signer yang belum TTD tidak punya `pdf_path`).
+  - Search input (`.apple-input`) yang memfilter tabel berdasarkan nama ATAU NIP, reuse `matchesSignerQuery` dari `src/lib/signerFilter.ts` (tidak ada fungsi baru ditambahkan ke file itu).
+  - Statistik "Sudah menandatangani X/Y" tetap dihitung dari `signers` mentah, bukan hasil filter — tidak berubah saat mengetik di kotak cari.
+  - Empty state terpisah untuk "tidak ada peserta sama sekali" vs "ada peserta tapi tidak cocok dengan pencarian".
 
 ### Files Changed
-- `src/components/pakta-signer/PaktaSignPage.tsx`
+- `api/pakta-admin.ts`
+- `tests/paktaAdmin.test.ts`
+- `src/components/pakta-admin/PaktaDashboard.tsx`
 
 ### Commands Run
-- `npx vitest run` — ✅ 83/83 pass (tidak ada test baru — codebase tidak punya precedent test komponen React)
+- `npx vitest run` — ✅ 86/86 pass (83 baseline + 3 test baru untuk `reset_signer`)
 - `npm run build` — ✅ 0 error
-- Verifikasi manual: controller menulis render test sementara (`@testing-library/react`, mocking `paktaStore`/`pdfRenderer`/`SignaturePad`), dijalankan dua kali — pertama versi dasar dari plan (lolos), lalu diperkuat sendiri dengan `MutationObserver` untuk membuktikan **lebih dari satu** label tahap benar-benar tampak berganti (bukan cuma satu yang kebetulan tertangkap `waitFor`), dan spy pada `URL.createObjectURL`/`URL.revokeObjectURL` untuk konfirmasi tombol unduh membuat `Blob` bertipe `application/pdf` dan membersihkan object URL setelahnya. File test dihapus setelah dipakai, tidak masuk commit manapun.
+- Verifikasi manual: controller menulis render test sementara (`@testing-library/react`, mocking `PaktaAdminContext`/`qrcode`/`ImportSignersModal`), dijalankan terhadap implementasi sungguhan. Dikonfirmasi: tombol "Reset" hanya muncul 1x (di baris "sudah", bukan "belum"); `window.confirm` Cancel mencegah `callAdmin('reset_signer', ...)` terpanggil; OK memanggil dengan id yang benar; search memfilter berdasarkan nama DAN NIP; kartu statistik "1/2" tetap stabil saat mengetik; pesan "tidak ada yang cocok" muncul untuk search tanpa hasil. File test dihapus setelah dipakai, tidak masuk commit manapun.
 
 ### Validation
 - Build: ✅ PASS
 - Lint: N/A (tidak ada script lint)
-- Test: ✅ 83/83 PASS
+- Test: ✅ 86/86 PASS
 
 ### Proses Eksekusi (Subagent-Driven Development)
-Task 1 dan Task 2 di plan sengaja digabung jadi satu dispatch implementer (model sonnet, karena Task 1 sendirian meninggalkan kode dalam keadaan tidak build-clean by design — field `pdfBytes` di-referensikan sebelum tipe-nya diperluas di Task 2) — satu commit gabungan, satu review gabungan (model sonnet), lolos "Approved" tanpa temuan Critical/Important. Task 3 (verifikasi manual, tidak bisa dilakukan implementer/reviewer karena butuh eksekusi test runtime yang detail) dikerjakan controller. Final whole-branch review model Opus: "Ready to merge: Yes". Ledger progres di `.superpowers/sdd/progress.md`.
+Task 1 (backend TDD, model haiku), Task 2 (tombol reset, model haiku), Task 3 (search, model sonnet karena integrasi ke blok tabel yang sudah dimodifikasi Task 2) masing-masing dikerjakan implementer terpisah + task reviewer (model sonnet), semua lolos "Approved" tanpa temuan Critical/Important. Task 4 (verifikasi manual, tidak bisa dilakukan implementer/reviewer) dikerjakan controller. Final whole-branch review model Opus: "Ready to merge: Yes" — termasuk pengecekan spesifik bahwa action destruktif `reset_signer` tidak bypass gate password admin. Ledger progres di `.superpowers/sdd/progress.md`.
 
 Commit:
-1. `cb9bfe0` — progress bertahap saat submit + unduh PDF di halaman sukses
+1. `3280d5a` — tambah action reset_signer untuk reset tanda tangan
+2. `73e688e` — tambah tombol reset tanda tangan di dashboard
+3. `1c59bf4` — tambah search nama/NIP di dashboard
 
-(Base untuk fitur ini: `2524829`, commit docs terakhir sebelum implementasi dimulai.)
+(Base untuk fitur ini: `f3ecb54`, commit docs terakhir sebelum implementasi dimulai.)
 
 ### Known Issues
-- Minor (tidak blocking, dari review): `downloadSuccessPdf` tidak membungkus `a.click()` dalam try/finally sebelum `URL.revokeObjectURL` — secara praktis aman (klik sintetis tidak throw), dan implementasi ini justru lebih baik dari referensi `downloadPdf` di `PaktaDashboard.tsx` yang malah tidak ada `revokeObjectURL` sama sekali (pakai signed URL remote, bukan object URL lokal).
-- Fitur ini TIDAK diverifikasi dengan data Supabase riil di browser sungguhan (sama seperti sesi sebelumnya — tidak ada akses password admin pakta atau acara dengan peserta untuk uji end-to-end). Verifikasi manual dilakukan lewat render test ter-mock, bukan browser dengan backend asli.
+- Minor (tidak blocking, dari final review): spec menyebut kondisi tombol "kalau `s.status === 'sudah'`" tapi implementasi men-gate di `s.pdf_path ?`. Keduanya setara secara perilaku (backend `reset_signer` men-null-kan keduanya sekaligus jadi selalu sinkron), dan gate `pdf_path` justru lebih aman (kalau ada anomali data status='sudah' tanpa pdf_path, tombol tidak akan menunjuk ke PDF yang tidak ada). Tidak perlu perbaikan kode, hanya catatan mismatch redaksi.
+- Minor (dari task review, diwarisi dari brief): lookup `select('pdf_path').single()` di `reset_signer` membuang `error`-nya — kalau `id` tidak valid/sudah dihapus, `update` di bawahnya akan diam-diam tidak mengubah baris manapun (bukan 404). Kasus tepi sangat jarang dari UI (tombol hanya muncul untuk baris yang sudah dimuat dari tabel yang sama).
+- Fitur ini TIDAK diverifikasi dengan data Supabase riil di browser sungguhan (sama seperti sesi-sesi sebelumnya — tidak ada akses password admin pakta atau acara dengan peserta untuk uji end-to-end). Verifikasi manual dilakukan lewat render test ter-mock.
 
 ### Next Step
-- Menunggu approval user untuk push branch dan buat PR baru (PR terpisah dari #23 dan #24 yang sudah merged).
-- Setelah PR dibuat & di-merge: user disarankan mencoba submit tanda tangan sungguhan di `/#pakta/<eventId>` untuk konfirmasi visual progress bar bergerak + label berganti, dan klik "Unduh PDF" di halaman sukses untuk konfirmasi file yang terunduh valid.
+- Menunggu approval user untuk push branch dan buat PR baru (PR terpisah dari #23, #24, #25 yang sudah merged).
+- Setelah PR dibuat & di-merge: user disarankan mencoba reset tanda tangan pada peserta sungguhan di dashboard admin (konfirmasi PDF lama benar-benar terhapus dari storage dan peserta bisa TTD ulang lewat link publik), dan coba fitur cari nama/NIP di acara dengan banyak peserta.
