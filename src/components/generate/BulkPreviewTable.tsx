@@ -45,7 +45,7 @@ export function BulkPreviewTable({ rows, numbers }: { rows: ValidatedRow[]; numb
       </div>
 
       {/* Table */}
-      <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+      <div className="apple-table-wrap" style={{ maxHeight: 320, overflowY: 'auto' }}>
         <table className="apple-table">
           <thead>
             <tr>

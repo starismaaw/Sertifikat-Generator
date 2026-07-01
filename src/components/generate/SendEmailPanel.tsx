@@ -248,7 +248,7 @@ function RecipientTable() {
         )}
       </div>
 
-      <div style={{ maxHeight: 260, overflowY: 'auto', border: '1px solid var(--color-hairline)', borderRadius: 8 }}>
+      <div style={{ maxHeight: 260, overflowY: 'auto', overflowX: 'auto', border: '1px solid var(--color-hairline)', borderRadius: 8 }}>
         <table className="apple-table" style={{ fontSize: 13 }}>
           <thead>
             <tr><th>Nama</th><th>Email</th><th>Status</th></tr>

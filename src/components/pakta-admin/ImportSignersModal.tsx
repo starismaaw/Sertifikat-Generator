@@ -86,7 +86,7 @@ export function ImportSignersModal({
       <div className="sg-modal" style={{ maxWidth: 560 }} role="dialog" aria-modal="true">
         <div className="sg-modal-header">
           <h2 className="sg-modal-title">Impor Daftar Pegawai</h2>
-          <button className="sg-modal-close" onClick={onClose}>×</button>
+          <button className="sg-modal-close" onClick={onClose} aria-label="Tutup">×</button>
         </div>
         <div className="sg-modal-body">
           {error && <div className="apple-error" style={{ marginBottom: 12 }}>{error}</div>}
