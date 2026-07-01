@@ -3,7 +3,7 @@ import type { CertEvent, Field, Perataan } from '../../types';
 import { ColorPickerField } from './ColorPickerField';
 import { AlignmentToolbar } from './AlignmentToolbar';
 import { FIELD_LABELS } from './FieldPalette';
-import { FONT_FAMILIES, FONT_WEIGHTS } from '../../lib/fontRegistry';
+import { FONT_FAMILIES, FONT_WEIGHTS, isWeightDisabled } from '../../lib/fontRegistry';
 
 function safeNum(val: string, fallback: number): number {
   const n = Number(val);
@@ -166,8 +166,7 @@ function FieldTab({
         >
           {FONT_WEIGHTS.map(w => {
             const currentFont = FONT_FAMILIES.find(f => f.value === selected.fontFamily);
-            const isItalicVariant = w.value === 'Italic' || w.value === 'BoldItalic';
-            const disabled = isItalicVariant && currentFont ? !currentFont.hasItalic : false;
+            const disabled = isWeightDisabled(w.value, currentFont);
             return (
               <option key={w.value} value={w.value} disabled={disabled}>
                 {w.label}

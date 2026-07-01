@@ -6,16 +6,16 @@ import { copyFileSync, existsSync, mkdirSync } from 'fs'
 import { resolve } from 'path'
 
 const FONTS = [
-  { pkg: 'playfair-display', out: 'PlayfairDisplay', hasItalic: true },
-  { pkg: 'eb-garamond',      out: 'EBGaramond',      hasItalic: true },
-  { pkg: 'cinzel',           out: 'Cinzel',           hasItalic: false },
-  { pkg: 'merriweather',     out: 'Merriweather',     hasItalic: true },
-  { pkg: 'lato',             out: 'Lato',             hasItalic: true },
-  { pkg: 'montserrat',       out: 'Montserrat',       hasItalic: true },
-  { pkg: 'roboto',           out: 'Roboto',           hasItalic: true },
-  { pkg: 'open-sans',        out: 'OpenSans',         hasItalic: true },
-  { pkg: 'raleway',          out: 'Raleway',          hasItalic: true },
-  { pkg: 'noto-serif',       out: 'NotoSerif',        hasItalic: true },
+  { pkg: 'playfair-display', out: 'PlayfairDisplay', hasItalic: true,  hasSemiBold: true },
+  { pkg: 'eb-garamond',      out: 'EBGaramond',      hasItalic: true,  hasSemiBold: true },
+  { pkg: 'cinzel',           out: 'Cinzel',           hasItalic: false, hasSemiBold: true },
+  { pkg: 'merriweather',     out: 'Merriweather',     hasItalic: true,  hasSemiBold: true },
+  { pkg: 'lato',             out: 'Lato',             hasItalic: true,  hasSemiBold: false },
+  { pkg: 'montserrat',       out: 'Montserrat',       hasItalic: true,  hasSemiBold: true },
+  { pkg: 'roboto',           out: 'Roboto',           hasItalic: true,  hasSemiBold: true },
+  { pkg: 'open-sans',        out: 'OpenSans',         hasItalic: true,  hasSemiBold: true },
+  { pkg: 'raleway',          out: 'Raleway',          hasItalic: true,  hasSemiBold: true },
+  { pkg: 'noto-serif',       out: 'NotoSerif',        hasItalic: true,  hasSemiBold: true },
 ]
 
 mkdirSync('public/fonts', { recursive: true })
@@ -42,6 +42,12 @@ for (const font of FONTS) {
   if (font.hasItalic) {
     copyFont(400, 'Italic',     'italic')
     copyFont(700, 'BoldItalic', 'italic')
+  }
+  if (font.hasSemiBold) {
+    copyFont(600, 'SemiBold', 'normal')
+    if (font.hasItalic) {
+      copyFont(600, 'SemiBoldItalic', 'italic')
+    }
   }
 }
 
