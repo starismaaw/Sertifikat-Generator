@@ -1,5 +1,5 @@
 import { useState, useEffect, Fragment } from 'react';
-import { Stage, Layer, Image as KImage, Rect, Text } from 'react-konva';
+import { Stage, Layer, Image as KImage, Rect, Text, Group } from 'react-konva';
 import type Konva from 'konva';
 import type { CertEvent } from '../../types';
 import { FIELD_LABELS } from './FieldPalette';
@@ -77,11 +77,22 @@ export function EditorCanvas({
               const sx = f.x * scale;
               const sy = f.y * scale;
               const sw = f.lebar * scale;
+              const lineHeight = f.ukuran * scale * 1.4;
               // Zona harus sama persis dengan yang dipakai renderPakta/renderCertificate:
-              // field tandaTangan pakai field.tinggi (bukan ukuran font) sebagai tinggi gambar.
+              // - tandaTangan pakai field.tinggi (bukan ukuran font) sebagai tinggi gambar.
+              // - namaNip 2 baris teks (nama + NIP), tingginya 2x tinggi satu baris.
               const zoneHeight = f.tipe === 'tandaTangan'
                 ? (f.tinggi ?? f.lebar / 2) * scale
-                : f.ukuran * scale * 1.4;
+                : f.tipe === 'namaNip'
+                  ? lineHeight * 2
+                  : lineHeight;
+
+              const handleDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
+                const x = e.target.x() / scale;
+                const y = e.target.y() / scale;
+                onSelect(f.id);
+                onMove(f.id, x, y);
+              };
 
               return (
                 <Fragment key={f.id}>
@@ -97,26 +108,56 @@ export function EditorCanvas({
                     cornerRadius={3}
                     listening={false}
                   />
-                  <Text
-                    text={FIELD_LABELS[f.tipe]}
-                    x={sx}
-                    y={sy}
-                    fontFamily={f.fontFamily}
-                    fontStyle={konvaFontStyle(f.fontWeight)}
-                    fontSize={f.ukuran * scale}
-                    fill={f.warna}
-                    width={sw}
-                    align={f.perataan}
-                    draggable
-                    onClick={() => onSelect(f.id)}
-                    onTap={() => onSelect(f.id)}
-                    onDragEnd={(e: Konva.KonvaEventObject<DragEvent>) => {
-                      const x = e.target.x() / scale;
-                      const y = e.target.y() / scale;
-                      onSelect(f.id);
-                      onMove(f.id, x, y);
-                    }}
-                  />
+                  {f.tipe === 'namaNip' ? (
+                    <Group
+                      x={sx}
+                      y={sy}
+                      draggable
+                      onClick={() => onSelect(f.id)}
+                      onTap={() => onSelect(f.id)}
+                      onDragEnd={handleDragEnd}
+                    >
+                      <Text
+                        text="Nama Pegawai"
+                        x={0}
+                        y={0}
+                        fontFamily={f.fontFamily}
+                        fontStyle={konvaFontStyle(f.fontWeight)}
+                        fontSize={f.ukuran * scale}
+                        fill={f.warna}
+                        width={sw}
+                        align={f.perataan}
+                        textDecoration="underline"
+                      />
+                      <Text
+                        text="NIP. XXXXXXXXXXXXXXXXXX"
+                        x={0}
+                        y={lineHeight}
+                        fontFamily={f.fontFamily}
+                        fontStyle={konvaFontStyle(f.fontWeight)}
+                        fontSize={f.ukuran * scale}
+                        fill={f.warna}
+                        width={sw}
+                        align={f.perataan}
+                      />
+                    </Group>
+                  ) : (
+                    <Text
+                      text={FIELD_LABELS[f.tipe]}
+                      x={sx}
+                      y={sy}
+                      fontFamily={f.fontFamily}
+                      fontStyle={konvaFontStyle(f.fontWeight)}
+                      fontSize={f.ukuran * scale}
+                      fill={f.warna}
+                      width={sw}
+                      align={f.perataan}
+                      draggable
+                      onClick={() => onSelect(f.id)}
+                      onTap={() => onSelect(f.id)}
+                      onDragEnd={handleDragEnd}
+                    />
+                  )}
                 </Fragment>
               );
             })}
