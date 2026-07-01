@@ -11,8 +11,17 @@ type PageState =
   | { step: 'pickName'; template: PaktaTemplate & { eventId: string; nama: string; tanggal: string; templatePath: string }; signers: SignerRow[] }
   | { step: 'signing'; template: PaktaTemplate & { eventId: string; nama: string; tanggal: string; templatePath: string }; signer: SignerRow; backgroundDataUrl: string }
   | { step: 'submitting' }
-  | { step: 'success'; signerNama: string }
+  | { step: 'success'; signerNama: string; pdfBytes: Uint8Array }
   | { step: 'error'; message: string };
+
+type SubmitPhase = 'preparing' | 'rendering' | 'uploading' | 'saving';
+
+const SUBMIT_PHASE_LABELS: Record<SubmitPhase, string> = {
+  preparing: 'Menyiapkan dokumen…',
+  rendering: 'Membuat PDF…',
+  uploading: 'Mengunggah dokumen…',
+  saving: 'Menyimpan status…',
+};
 
 async function loadBackground(templatePath: string): Promise<string> {
   const url = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/pakta-templates/${templatePath}`;
@@ -32,6 +41,7 @@ export function PaktaSignPage({ eventId }: { eventId: string }) {
   const [loadKey, setLoadKey] = useState(0);
   const [query, setQuery] = useState('');
   const [showSudah, setShowSudah] = useState(false);
+  const [submitPhase, setSubmitPhase] = useState<SubmitPhase>('preparing');
   const sigPadRef = useRef<SignaturePadHandle>(null);
 
   useEffect(() => {
@@ -72,6 +82,7 @@ export function PaktaSignPage({ eventId }: { eventId: string }) {
       return;
     }
     const { template, signer, backgroundDataUrl } = state;
+    setSubmitPhase('preparing');
     setState({ step: 'submitting' });
 
     try {
@@ -95,8 +106,10 @@ export function PaktaSignPage({ eventId }: { eventId: string }) {
       }
       const { signedUrl, pdfPath } = await urlResp.json() as { signedUrl: string; pdfPath: string };
 
+      setSubmitPhase('rendering');
       const pdfBytes = await renderPakta(templateWithBg, values, signaturePng);
 
+      setSubmitPhase('uploading');
       const uploadResp = await fetch(signedUrl, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/pdf' },
@@ -104,6 +117,7 @@ export function PaktaSignPage({ eventId }: { eventId: string }) {
       });
       if (!uploadResp.ok) throw new Error('Gagal mengunggah dokumen ke server');
 
+      setSubmitPhase('saving');
       try {
         await updateSignerDone(signer.id, pdfPath);
       } catch (dbErr) {
@@ -114,10 +128,20 @@ export function PaktaSignPage({ eventId }: { eventId: string }) {
         return;
       }
 
-      setState({ step: 'success', signerNama: signer.nama });
+      setState({ step: 'success', signerNama: signer.nama, pdfBytes });
     } catch (err) {
       setState({ step: 'error', message: (err as Error).message });
     }
+  }
+
+  function downloadSuccessPdf(signerNama: string, pdfBytes: Uint8Array) {
+    const blob = new Blob([pdfBytes as unknown as BlobPart], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `pakta-${signerNama.replace(/\s+/g, '_')}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   if (state.step === 'loading') {
@@ -269,9 +293,12 @@ export function PaktaSignPage({ eventId }: { eventId: string }) {
     return (
       <div className="apple-page">
         <div className="apple-page-compact">
-          <p style={{ color: 'var(--color-ink-faint)', textAlign: 'center', marginTop: 64 }}>
-            Mengirim tanda tangan…
-          </p>
+          <div className="apple-progress" style={{ marginTop: 64 }}>
+            <div className="apple-progress-phase">{SUBMIT_PHASE_LABELS[submitPhase]}</div>
+            <div className="apple-progress-track">
+              <div className="apple-progress-fill indeterminate" />
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -288,6 +315,13 @@ export function PaktaSignPage({ eventId }: { eventId: string }) {
               Terima kasih, <strong>{state.signerNama}</strong>.<br />
               Pakta Integritas Anda telah berhasil ditandatangani dan disimpan.
             </p>
+            <button
+              className="apple-btn apple-btn-primary"
+              style={{ marginTop: 24 }}
+              onClick={() => downloadSuccessPdf(state.signerNama, state.pdfBytes)}
+            >
+              Unduh PDF
+            </button>
           </div>
         </div>
       </div>
