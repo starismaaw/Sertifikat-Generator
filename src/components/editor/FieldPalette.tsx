@@ -10,6 +10,7 @@ const LABELS: Record<FieldTipe, string> = {
   penandatangan: 'Jabatan penandatangan',
   nip: 'NIP',
   jabatan: 'Jabatan',
+  namaNip: 'Nama & NIP',
   tandaTangan: 'Tanda Tangan',
 };
 
