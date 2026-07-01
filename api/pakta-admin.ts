@@ -133,6 +133,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ ok: true });
     }
 
+    case 'reset_signer': {
+      const { id } = body as { id: string };
+      if (!id) return res.status(400).json({ error: 'id peserta wajib diisi' });
+
+      const { data: signer } = await sb
+        .from('pakta_signers')
+        .select('pdf_path')
+        .eq('id', id)
+        .single();
+
+      if (signer?.pdf_path) {
+        await sb.storage.from('pakta-documents').remove([signer.pdf_path]);
+      }
+
+      const { error } = await sb
+        .from('pakta_signers')
+        .update({ status: 'belum', signed_at: null, pdf_path: null })
+        .eq('id', id);
+      if (error) return res.status(500).json({ error: error.message });
+      return res.status(200).json({ ok: true });
+    }
+
     case 'get_signed_url': {
       const { path } = body as { path: string };
       if (!path) return res.status(400).json({ error: 'path wajib diisi' });

@@ -3,6 +3,7 @@ import QRCode from 'qrcode';
 import { navigate } from '../AppRouter';
 import { usePaktaAdmin } from '../../contexts/PaktaAdminContext';
 import { ImportSignersModal } from './ImportSignersModal';
+import { matchesSignerQuery } from '../../lib/signerFilter';
 
 interface Signer {
   id: string;
@@ -30,6 +31,7 @@ export function PaktaDashboard({ eventId }: { eventId: string }) {
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [showImport, setShowImport] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
 
   const publicUrl = `${window.location.origin}/#pakta/${eventId}`;
 
@@ -65,6 +67,16 @@ export function PaktaDashboard({ eventId }: { eventId: string }) {
     }
   }
 
+  async function resetSigner(signer: Signer) {
+    if (!confirm(`Reset tanda tangan ${signer.nama}? PDF yang sudah ditandatangani akan dihapus permanen dan pegawai ini bisa TTD ulang.`)) return;
+    try {
+      await callAdmin('reset_signer', { id: signer.id });
+      load();
+    } catch (err) {
+      alert((err as Error).message);
+    }
+  }
+
   function copyLink() {
     navigator.clipboard.writeText(publicUrl).catch(() => {});
   }
@@ -81,6 +93,9 @@ export function PaktaDashboard({ eventId }: { eventId: string }) {
   const signers = event.pakta_signers ?? [];
   const sudahCount = signers.filter(s => s.status === 'sudah').length;
   const totalCount = signers.length;
+  const filteredSigners = signers.filter(s =>
+    matchesSignerQuery(s.nama, query) || matchesSignerQuery(s.nip, query)
+  );
 
   return (
     <div className="apple-page apple-page-wide">
@@ -124,49 +139,72 @@ export function PaktaDashboard({ eventId }: { eventId: string }) {
           {signers.length === 0 ? (
             <p className="apple-empty">Belum ada pegawai. Klik "Impor Pegawai" untuk menambahkan.</p>
           ) : (
-            <div className="apple-table-wrap">
-              <table className="apple-table">
-                <thead>
-                  <tr>
-                    <th>Nama</th>
-                    <th>NIP</th>
-                    <th>Jabatan</th>
-                    <th>Status</th>
-                    <th>Waktu TTD</th>
-                    <th>Unduh</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {signers.map(s => (
-                    <tr key={s.id}>
-                      <td>{s.nama}</td>
-                      <td>{s.nip}</td>
-                      <td>{s.jabatan}</td>
-                      <td>
-                        <span className={`apple-badge ${s.status === 'sudah' ? 'apple-badge-ok' : 'apple-badge-warn'}`}>
-                          {s.status === 'sudah' ? 'Sudah' : 'Belum'}
-                        </span>
-                      </td>
-                      <td className="apple-caption">
-                        {s.signed_at ? new Date(s.signed_at).toLocaleString('id-ID') : '—'}
-                      </td>
-                      <td>
-                        {s.pdf_path ? (
-                          <button
-                            className="sg-btn sg-btn-outline"
-                            style={{ fontSize: 12, padding: '2px 10px' }}
-                            disabled={downloadingId === s.id}
-                            onClick={() => downloadPdf(s)}
-                          >
-                            {downloadingId === s.id ? '…' : 'PDF'}
-                          </button>
-                        ) : '—'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <>
+              <input
+                type="text"
+                className="apple-input"
+                placeholder="Cari nama atau NIP…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                style={{ width: '100%', marginBottom: 12 }}
+              />
+              {filteredSigners.length === 0 ? (
+                <p className="apple-empty">Tidak ada peserta yang cocok dengan pencarian.</p>
+              ) : (
+                <div className="apple-table-wrap">
+                  <table className="apple-table">
+                    <thead>
+                      <tr>
+                        <th>Nama</th>
+                        <th>NIP</th>
+                        <th>Jabatan</th>
+                        <th>Status</th>
+                        <th>Waktu TTD</th>
+                        <th>Unduh</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredSigners.map(s => (
+                        <tr key={s.id}>
+                          <td>{s.nama}</td>
+                          <td>{s.nip}</td>
+                          <td>{s.jabatan}</td>
+                          <td>
+                            <span className={`apple-badge ${s.status === 'sudah' ? 'apple-badge-ok' : 'apple-badge-warn'}`}>
+                              {s.status === 'sudah' ? 'Sudah' : 'Belum'}
+                            </span>
+                          </td>
+                          <td className="apple-caption">
+                            {s.signed_at ? new Date(s.signed_at).toLocaleString('id-ID') : '—'}
+                          </td>
+                          <td>
+                            {s.pdf_path ? (
+                              <div style={{ display: 'flex', gap: 6 }}>
+                                <button
+                                  className="sg-btn sg-btn-outline"
+                                  style={{ fontSize: 12, padding: '2px 10px' }}
+                                  disabled={downloadingId === s.id}
+                                  onClick={() => downloadPdf(s)}
+                                >
+                                  {downloadingId === s.id ? '…' : 'PDF'}
+                                </button>
+                                <button
+                                  className="sg-btn sg-btn-outline"
+                                  style={{ fontSize: 12, padding: '2px 10px' }}
+                                  onClick={() => resetSigner(s)}
+                                >
+                                  Reset
+                                </button>
+                              </div>
+                            ) : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
           )}
         </div>
 
