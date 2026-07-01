@@ -151,4 +151,49 @@ describe('pakta-admin handler', () => {
     expect(res.statusCode).toBe(200);
     expect(res.body.signedUrl).toContain('token=abc');
   });
+
+  // WHY: hapus acara harus membersihkan file template + PDF signer di storage sebelum hapus baris DB.
+  it('delete_event menghapus file storage lalu baris acara', async () => {
+    const removeMock = vi.fn().mockResolvedValue({ error: null });
+    const storageFromMock = vi.fn().mockReturnValue({ remove: removeMock });
+
+    fromAdminMock
+      .mockReturnValueOnce({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({ data: { template_path: 'templates/ev1.png' }, error: null }),
+          }),
+        }),
+      })
+      .mockReturnValueOnce({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({ data: [{ pdf_path: 'docs/ev1/s1.pdf' }, { pdf_path: null }], error: null }),
+        }),
+      })
+      .mockReturnValueOnce({
+        delete: vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({ error: null }),
+        }),
+      });
+
+    createClientMock.mockReturnValue({ from: fromAdminMock, storage: { from: storageFromMock } });
+
+    const res = mockRes();
+    await handler(mockReq({ action: 'delete_event', id: 'ev1' }), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(storageFromMock).toHaveBeenCalledWith('pakta-templates');
+    expect(storageFromMock).toHaveBeenCalledWith('pakta-documents');
+    expect(removeMock).toHaveBeenCalledWith(['templates/ev1.png']);
+    expect(removeMock).toHaveBeenCalledWith(['docs/ev1/s1.pdf']);
+  });
+
+  // WHY: id acara wajib diisi agar tidak menghapus tanpa target.
+  it('delete_event menolak bila id tidak ada', async () => {
+    fromAdminMock.mockReturnValue({});
+    const res = mockRes();
+    await handler(mockReq({ action: 'delete_event' }), res);
+    expect(res.statusCode).toBe(400);
+  });
 });
