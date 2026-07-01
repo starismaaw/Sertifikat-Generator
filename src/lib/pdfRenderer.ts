@@ -1,7 +1,7 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import type { CertEvent, Field, FieldValues, PaktaTemplate } from '../types';
-import { getFontPath, type FontWeight } from './fontRegistry';
+import { getFontPath, WEIGHT_CSS, type FontWeight } from './fontRegistry';
 
 /** A 1x1 transparent PNG data URL — handy default/test background. */
 export const PNG_1x1 =
@@ -30,10 +30,9 @@ function fitFontSize(text: string, field: Field, font: PDFFont): number {
   return size;
 }
 
-function toCssFont(fontFamily: string, fontWeight: FontWeight, size: number): string {
-  const italic = fontWeight === 'Italic' || fontWeight === 'BoldItalic';
-  const bold   = fontWeight === 'Bold'   || fontWeight === 'BoldItalic';
-  return `${italic ? 'italic ' : ''}${bold ? 'bold ' : ''}${size}px "${fontFamily}"`;
+export function toCssFont(fontFamily: string, fontWeight: FontWeight, size: number): string {
+  const { weight, italic } = WEIGHT_CSS[fontWeight];
+  return `${italic ? 'italic ' : ''}${weight} ${size}px "${fontFamily}"`;
 }
 
 // Use browser canvas measurement so PDF centering matches the Konva preview exactly.

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { PDFDocument, PDFName, PDFRawStream, PDFRef, PDFArray, decodePDFRawStream } from 'pdf-lib';
-import { renderCertificate, renderPakta, PNG_1x1 } from '../src/lib/pdfRenderer';
+import { renderCertificate, renderPakta, PNG_1x1, toCssFont } from '../src/lib/pdfRenderer';
 import type { CertEvent, PaktaTemplate } from '../src/types';
 
 function makeEvent(): CertEvent {
@@ -210,5 +210,16 @@ describe('renderPakta', () => {
     const content = await pageContentText(doc);
     const [y1, y2] = extractTmYValues(content);
     expect(y1 - y2).toBeCloseTo(20 * 1.4, 1);
+  });
+});
+
+describe('toCssFont', () => {
+  it('produces the correct CSS font string for every weight', () => {
+    expect(toCssFont('Open Sans', 'Regular', 32)).toBe('400 32px "Open Sans"');
+    expect(toCssFont('Open Sans', 'SemiBold', 32)).toBe('600 32px "Open Sans"');
+    expect(toCssFont('Open Sans', 'Bold', 32)).toBe('700 32px "Open Sans"');
+    expect(toCssFont('Open Sans', 'Italic', 32)).toBe('italic 400 32px "Open Sans"');
+    expect(toCssFont('Open Sans', 'SemiBoldItalic', 32)).toBe('italic 600 32px "Open Sans"');
+    expect(toCssFont('Open Sans', 'BoldItalic', 32)).toBe('italic 700 32px "Open Sans"');
   });
 });
