@@ -10,6 +10,7 @@ export type FieldTipe =
   | 'namaPenandatangan'
   | 'nip'
   | 'jabatan'
+  | 'namaNip'
   | 'tandaTangan';
 
 export type Perataan = 'left' | 'center' | 'right';

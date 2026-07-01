@@ -4,10 +4,11 @@ const PAKTA_LABELS: Partial<Record<FieldTipe, string>> = {
   nama: 'Nama pegawai',
   nip: 'NIP',
   jabatan: 'Jabatan',
+  namaNip: 'Nama & NIP',
   tandaTangan: 'Tanda Tangan',
 };
 
-const PAKTA_FIELDS: FieldTipe[] = ['nama', 'nip', 'jabatan', 'tandaTangan'];
+const PAKTA_FIELDS: FieldTipe[] = ['nama', 'nip', 'jabatan', 'namaNip', 'tandaTangan'];
 
 function PlusIcon() {
   return (
