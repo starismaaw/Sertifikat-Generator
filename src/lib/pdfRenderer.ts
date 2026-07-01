@@ -126,6 +126,58 @@ async function drawTextField(
 }
 
 /**
+ * Gambar field gabungan Nama & NIP: baris nama (bergaris bawah, lebar garis
+ * mengikuti lebar teks) lalu baris "NIP. <nip>" satu tinggi-baris di bawahnya.
+ */
+async function drawNamaNipField(
+  page: PDFPage,
+  field: Field,
+  nama: string,
+  nip: string,
+  getFont: (family: string, weight: FontWeight) => Promise<PDFFont>,
+  pageHeight: number,
+): Promise<void> {
+  const font = await getFont(field.fontFamily, field.fontWeight);
+  const lineHeight = field.ukuran * 1.4;
+  const color = hexToRgb(field.warna);
+
+  // Baris 1: nama, bergaris bawah pas selebar teks.
+  const namaSize = fitFontSize(nama, field, font);
+  const namaAscent = font.heightAtSize(namaSize, { descender: false });
+  const namaX = alignedX(nama, field, font, namaSize);
+  const namaY = pageHeight - field.y - namaAscent;
+  page.drawText(nama, { x: namaX, y: namaY, size: namaSize, font, color });
+
+  const namaWidth = browserTextWidth(
+    nama,
+    field.fontFamily,
+    field.fontWeight,
+    namaSize,
+    () => font.widthOfTextAtSize(nama, namaSize),
+  );
+  const underlineY = namaY - namaSize * 0.08;
+  page.drawLine({
+    start: { x: namaX, y: underlineY },
+    end: { x: namaX + namaWidth, y: underlineY },
+    thickness: Math.max(0.5, namaSize * 0.04),
+    color,
+  });
+
+  // Baris 2: "NIP. <nip>", tanpa garis bawah. field.y = TOP baris 1;
+  // TOP baris 2 = field.y + lineHeight (satu tinggi-baris di bawahnya).
+  const nipText = `NIP. ${nip}`;
+  const nipSize = fitFontSize(nipText, field, font);
+  const nipAscent = font.heightAtSize(nipSize, { descender: false });
+  page.drawText(nipText, {
+    x: alignedX(nipText, field, font, nipSize),
+    y: pageHeight - (field.y + lineHeight) - nipAscent,
+    size: nipSize,
+    font,
+    color,
+  });
+}
+
+/**
  * Render satu Pakta Integritas ke PDF.
  * `values` mengisi field teks; `signaturePng` (data URL) disisipkan pada field
  * bertipe 'tandaTangan'. Bila null, field tanda tangan dilewati.
@@ -159,6 +211,12 @@ export async function renderPakta(
         width: field.lebar,
         height: h,
       });
+      continue;
+    }
+    if (field.tipe === 'namaNip') {
+      const nama = (values.nama ?? '').toString();
+      if (!nama) continue;
+      await drawNamaNipField(page, field, nama, (values.nip ?? '').toString(), getFont, template.bgHeight);
       continue;
     }
     const text = (values[field.tipe] ?? '').toString();

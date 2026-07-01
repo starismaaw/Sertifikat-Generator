@@ -72,6 +72,17 @@ function countImages(doc: PDFDocument): number {
   return n;
 }
 
+/** Hitung token operator PDF tertentu (mis. 'Tj' untuk teks, 'S' untuk garis) di content stream. */
+function countTokens(content: string, token: string): number {
+  return content.split(/\s+/).filter(t => t === token).length;
+}
+
+/** Ambil semua nilai Y dari operator text-matrix "1 0 0 1 x y Tm", berurutan sesuai kemunculan. */
+function extractTmYValues(content: string): number[] {
+  const matches = [...content.matchAll(/^1 0 0 1 [-\d.]+ (-?[\d.]+) Tm$/gm)];
+  return matches.map(m => parseFloat(m[1]));
+}
+
 describe('renderPakta', () => {
   it('menghasilkan PDF seukuran latar dengan field teks terisi', async () => {
     const tpl = makePaktaTemplate([
@@ -145,5 +156,59 @@ describe('renderPakta', () => {
     // Verify translation (x, y_pdf) and scale (width, height) are present
     expect(content).toContain('1 0 0 1 50 350 cm');
     expect(content).toContain('300 0 0 150 0 0 cm');
+  });
+
+  it('field namaNip: menggambar 2 baris teks + 1 garis bawah saat nama & NIP terisi', async () => {
+    const tpl = makePaktaTemplate([
+      { id: 'nn1', tipe: 'namaNip', x: 100, y: 400, lebar: 400,
+        fontFamily: 'Playfair Display', fontWeight: 'Regular',
+        ukuran: 20, warna: '#000000', perataan: 'center', formatter: 'none' },
+    ]);
+    const bytes = await renderPakta(tpl, { nama: 'Budi Santoso', nip: '198501012010011001' }, null);
+    const doc = await PDFDocument.load(bytes);
+    const content = await pageContentText(doc);
+    expect(countTokens(content, 'Tj')).toBe(2);
+    expect(countTokens(content, 'S')).toBe(1);
+  });
+
+  it('field namaNip: baris NIP tetap tampil ("NIP. " saja) walau data NIP kosong', async () => {
+    const tpl = makePaktaTemplate([
+      { id: 'nn1', tipe: 'namaNip', x: 100, y: 400, lebar: 400,
+        fontFamily: 'Playfair Display', fontWeight: 'Regular',
+        ukuran: 20, warna: '#000000', perataan: 'center', formatter: 'none' },
+    ]);
+    const bytes = await renderPakta(tpl, { nama: 'Budi Santoso' }, null);
+    const doc = await PDFDocument.load(bytes);
+    const content = await pageContentText(doc);
+    expect(countTokens(content, 'Tj')).toBe(2);
+    expect(countTokens(content, 'S')).toBe(1);
+  });
+
+  it('field namaNip: dilewati total (tanpa teks/garis) bila nama kosong', async () => {
+    const tpl = makePaktaTemplate([
+      { id: 'nn1', tipe: 'namaNip', x: 100, y: 400, lebar: 400,
+        fontFamily: 'Playfair Display', fontWeight: 'Regular',
+        ukuran: 20, warna: '#000000', perataan: 'center', formatter: 'none' },
+    ]);
+    const bytes = await renderPakta(tpl, { nip: '198501012010011001' }, null);
+    const doc = await PDFDocument.load(bytes);
+    const content = await pageContentText(doc);
+    expect(countTokens(content, 'Tj')).toBe(0);
+    expect(countTokens(content, 'S')).toBe(0);
+    expect(Math.round(doc.getPage(0).getWidth())).toBe(800);
+    expect(bytes.byteLength).toBeGreaterThan(100);
+  });
+
+  it('field namaNip: baris NIP tepat 1 tinggi-baris (ukuran*1.4) di bawah baris nama', async () => {
+    const tpl = makePaktaTemplate([
+      { id: 'nn1', tipe: 'namaNip', x: 100, y: 400, lebar: 400,
+        fontFamily: 'Playfair Display', fontWeight: 'Regular',
+        ukuran: 20, warna: '#000000', perataan: 'center', formatter: 'none' },
+    ]);
+    const bytes = await renderPakta(tpl, { nama: 'Budi Santoso', nip: '198501012010011001' }, null);
+    const doc = await PDFDocument.load(bytes);
+    const content = await pageContentText(doc);
+    const [y1, y2] = extractTmYValues(content);
+    expect(y1 - y2).toBeCloseTo(20 * 1.4, 1);
   });
 });
