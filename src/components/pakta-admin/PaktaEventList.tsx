@@ -3,6 +3,7 @@ import { usePaktaAdmin } from '../../contexts/PaktaAdminContext';
 import { navigate } from '../AppRouter';
 import { NewPaktaEventModal } from './NewPaktaEventModal';
 import { ImportSignersModal } from './ImportSignersModal';
+import { DeleteConfirmModal } from '../DeleteConfirmModal';
 
 interface PaktaEvent {
   id: string;
@@ -20,7 +21,21 @@ function PlusIcon() {
   );
 }
 
-function PaktaCard({ event, onReload }: { event: PaktaEvent; onReload: () => void }) {
+function TrashIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <path d="M2 3.5h10M5.5 3.5V2h3v1.5M5 3.5l.5 8M9 3.5l-.5 8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function PaktaCard({
+  event, onReload, onDelete,
+}: {
+  event: PaktaEvent;
+  onReload: () => void;
+  onDelete: (event: PaktaEvent) => void;
+}) {
   const { callAdmin } = usePaktaAdmin();
   const [showImport, setShowImport] = useState(false);
 
@@ -70,6 +85,13 @@ function PaktaCard({ event, onReload }: { event: PaktaEvent; onReload: () => voi
             <button className="sg-btn sg-btn-outline" onClick={toggleStatus}>
               {event.status === 'aktif' ? 'Tutup' : 'Buka'}
             </button>
+            <button
+              className="sg-btn sg-btn-icon"
+              aria-label="Hapus acara"
+              onClick={() => onDelete(event)}
+            >
+              <TrashIcon />
+            </button>
           </div>
         </div>
       </article>
@@ -89,6 +111,8 @@ export function PaktaEventList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showNew, setShowNew] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<PaktaEvent | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -108,6 +132,20 @@ export function PaktaEventList() {
 
   useEffect(() => { load(); }, []);
 
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await callAdmin('delete_event', { id: deleteTarget.id });
+      setDeleteTarget(null);
+      load();
+    } catch (err) {
+      alert((err as Error).message);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <div className="apple-page apple-page-compact">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
@@ -126,10 +164,19 @@ export function PaktaEventList() {
         <p className="apple-empty">Belum ada acara pakta. Buat acara pertama Anda.</p>
       )}
       {events.map(ev => (
-        <PaktaCard key={ev.id} event={ev} onReload={load} />
+        <PaktaCard key={ev.id} event={ev} onReload={load} onDelete={setDeleteTarget} />
       ))}
 
       {showNew && <NewPaktaEventModal onClose={() => { setShowNew(false); load(); }} />}
+
+      {deleteTarget && (
+        <DeleteConfirmModal
+          eventName={deleteTarget.nama}
+          issuedCount={0}
+          onClose={() => !deleting && setDeleteTarget(null)}
+          onConfirm={handleDelete}
+        />
+      )}
     </div>
   );
 }

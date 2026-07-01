@@ -101,6 +101,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ imported: rows.length });
     }
 
+    case 'delete_event': {
+      const { id } = body as { id: string };
+      if (!id) return res.status(400).json({ error: 'id acara wajib diisi' });
+
+      const { data: event } = await sb
+        .from('pakta_events')
+        .select('template_path')
+        .eq('id', id)
+        .single();
+
+      const { data: signers } = await sb
+        .from('pakta_signers')
+        .select('pdf_path')
+        .eq('event_id', id);
+
+      const templatePaths = event?.template_path ? [event.template_path] : [];
+      const pdfPaths = (signers ?? [])
+        .map(s => s.pdf_path)
+        .filter((p): p is string => !!p);
+
+      if (templatePaths.length > 0) {
+        await sb.storage.from('pakta-templates').remove(templatePaths);
+      }
+      if (pdfPaths.length > 0) {
+        await sb.storage.from('pakta-documents').remove(pdfPaths);
+      }
+
+      const { error } = await sb.from('pakta_events').delete().eq('id', id);
+      if (error) return res.status(500).json({ error: error.message });
+      return res.status(200).json({ ok: true });
+    }
+
     case 'get_signed_url': {
       const { path } = body as { path: string };
       if (!path) return res.status(400).json({ error: 'path wajib diisi' });
