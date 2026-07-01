@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { FieldValues, PaktaTemplate } from '../../types';
 import { getAcaraPakta, listSigners, updateSignerDone, type SignerRow } from '../../lib/paktaStore';
 import { renderPakta } from '../../lib/pdfRenderer';
+import { matchesSignerQuery } from '../../lib/signerFilter';
 import { SignaturePad, type SignaturePadHandle } from './SignaturePad';
 
 type PageState =
@@ -29,6 +30,8 @@ async function loadBackground(templatePath: string): Promise<string> {
 export function PaktaSignPage({ eventId }: { eventId: string }) {
   const [state, setState] = useState<PageState>({ step: 'loading' });
   const [loadKey, setLoadKey] = useState(0);
+  const [query, setQuery] = useState('');
+  const [showSudah, setShowSudah] = useState(false);
   const sigPadRef = useRef<SignaturePadHandle>(null);
 
   useEffect(() => {
@@ -147,8 +150,10 @@ export function PaktaSignPage({ eventId }: { eventId: string }) {
 
   if (state.step === 'pickName') {
     const { template, signers } = state;
-    const belum = signers.filter(s => s.status === 'belum');
-    const sudah = signers.filter(s => s.status === 'sudah');
+    const belum = signers.filter(s => s.status === 'belum' && matchesSignerQuery(s.nama, query));
+    const sudah = signers.filter(s => s.status === 'sudah' && matchesSignerQuery(s.nama, query));
+    const totalBelum = signers.filter(s => s.status === 'belum').length;
+    const totalSudah = signers.filter(s => s.status === 'sudah').length;
     return (
       <div className="apple-page">
         <div className="apple-page-compact">
@@ -157,40 +162,50 @@ export function PaktaSignPage({ eventId }: { eventId: string }) {
             Pilih nama Anda untuk menandatangani Pakta Integritas
           </p>
 
-          {belum.length > 0 && (
+          {signers.length > 0 && (
             <div className="apple-card" style={{ marginBottom: 16 }}>
-              <p style={{ fontWeight: 600, fontSize: 13, marginBottom: 12 }}>Belum menandatangani</p>
-              {belum.map(s => (
-                <button
-                  key={s.id}
-                  className="apple-btn apple-btn-primary"
-                  style={{ width: '100%', marginBottom: 8, textAlign: 'left', justifyContent: 'flex-start' }}
-                  onClick={() => handleSelectSigner(s)}
-                >
-                  <span style={{ fontWeight: 600 }}>{s.nama}</span>
-                  {s.nip && <span style={{ marginLeft: 8, opacity: 0.7, fontSize: 12 }}>{s.nip}</span>}
-                </button>
-              ))}
+              <p style={{ fontWeight: 600, fontSize: 13, marginBottom: 12 }}>
+                Belum menandatangani ({totalBelum})
+              </p>
+              <input
+                type="text"
+                className="apple-input"
+                placeholder="Cari nama…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                style={{ width: '100%', marginBottom: 12 }}
+              />
+              <div className="sg-signer-list-scroll">
+                {belum.length === 0 ? (
+                  <p className="apple-empty">Tidak ada nama yang cocok dengan pencarian.</p>
+                ) : (
+                  belum.map(s => (
+                    <button
+                      key={s.id}
+                      className="sg-signer-item"
+                      onClick={() => handleSelectSigner(s)}
+                    >
+                      <span className="sg-signer-item-nama">{s.nama}</span>
+                      {s.nip && <span className="sg-signer-item-nip">{s.nip}</span>}
+                    </button>
+                  ))
+                )}
+              </div>
             </div>
           )}
 
-          {sudah.length > 0 && (
+          {totalSudah > 0 && (
             <div className="apple-card">
-              <p style={{ fontWeight: 600, fontSize: 13, marginBottom: 12, color: 'var(--color-ink-faint)' }}>
-                Sudah menandatangani
-              </p>
-              {sudah.map(s => (
-                <div
-                  key={s.id}
-                  style={{
-                    padding: '10px 0',
-                    borderBottom: '1px solid var(--color-separator)',
-                    color: 'var(--color-ink-faint)',
-                    fontSize: 14,
-                  }}
-                >
-                  ✓ {s.nama}
-                  {s.nip && <span style={{ marginLeft: 8, fontSize: 12 }}>{s.nip}</span>}
+              <button
+                className="sg-signer-toggle"
+                onClick={() => setShowSudah(v => !v)}
+              >
+                Sudah menandatangani ({totalSudah}) {showSudah ? '▲' : '▼'}
+              </button>
+              {showSudah && sudah.map(s => (
+                <div key={s.id} className="sg-signer-item-done">
+                  <span>✓ {s.nama}</span>
+                  {s.nip && <span className="sg-signer-item-nip">{s.nip}</span>}
                 </div>
               ))}
             </div>
