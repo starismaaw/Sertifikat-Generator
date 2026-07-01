@@ -65,6 +65,16 @@ export function PaktaDashboard({ eventId }: { eventId: string }) {
     }
   }
 
+  async function resetSigner(signer: Signer) {
+    if (!confirm(`Reset tanda tangan ${signer.nama}? PDF yang sudah ditandatangani akan dihapus permanen dan pegawai ini bisa TTD ulang.`)) return;
+    try {
+      await callAdmin('reset_signer', { id: signer.id });
+      load();
+    } catch (err) {
+      alert((err as Error).message);
+    }
+  }
+
   function copyLink() {
     navigator.clipboard.writeText(publicUrl).catch(() => {});
   }
@@ -152,14 +162,23 @@ export function PaktaDashboard({ eventId }: { eventId: string }) {
                       </td>
                       <td>
                         {s.pdf_path ? (
-                          <button
-                            className="sg-btn sg-btn-outline"
-                            style={{ fontSize: 12, padding: '2px 10px' }}
-                            disabled={downloadingId === s.id}
-                            onClick={() => downloadPdf(s)}
-                          >
-                            {downloadingId === s.id ? '…' : 'PDF'}
-                          </button>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <button
+                              className="sg-btn sg-btn-outline"
+                              style={{ fontSize: 12, padding: '2px 10px' }}
+                              disabled={downloadingId === s.id}
+                              onClick={() => downloadPdf(s)}
+                            >
+                              {downloadingId === s.id ? '…' : 'PDF'}
+                            </button>
+                            <button
+                              className="sg-btn sg-btn-outline"
+                              style={{ fontSize: 12, padding: '2px 10px' }}
+                              onClick={() => resetSigner(s)}
+                            >
+                              Reset
+                            </button>
+                          </div>
                         ) : '—'}
                       </td>
                     </tr>
