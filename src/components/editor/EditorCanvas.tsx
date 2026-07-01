@@ -77,7 +77,11 @@ export function EditorCanvas({
               const sx = f.x * scale;
               const sy = f.y * scale;
               const sw = f.lebar * scale;
-              const textHeight = f.ukuran * scale * 1.4;
+              // Zona harus sama persis dengan yang dipakai renderPakta/renderCertificate:
+              // field tandaTangan pakai field.tinggi (bukan ukuran font) sebagai tinggi gambar.
+              const zoneHeight = f.tipe === 'tandaTangan'
+                ? (f.tinggi ?? f.lebar / 2) * scale
+                : f.ukuran * scale * 1.4;
 
               return (
                 <Fragment key={f.id}>
@@ -85,7 +89,7 @@ export function EditorCanvas({
                     x={sx - BOUNDARY_PADDING * scale}
                     y={sy - BOUNDARY_PADDING * scale}
                     width={sw + BOUNDARY_PADDING * 2 * scale}
-                    height={textHeight + BOUNDARY_PADDING * 2 * scale}
+                    height={zoneHeight + BOUNDARY_PADDING * 2 * scale}
                     fill={isSelected ? 'rgba(0,117,222,0.05)' : 'rgba(0,0,0,0.01)'}
                     stroke={isSelected ? '#0075de' : 'rgba(0,117,222,0.4)'}
                     strokeWidth={isSelected ? 2 : 0.8}
