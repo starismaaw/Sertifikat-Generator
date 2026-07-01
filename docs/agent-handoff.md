@@ -1,65 +1,60 @@
 ## Agent Handoff
 
 **Branch:** `claude/quizzical-elbakyan-b7f94e`
-**Task:** Tambah opsi weight `SemiBold` dan `SemiBoldItalic` ke sistem font (editor sertifikat & pakta integritas)
+**Task:** Perbaiki halaman publik pemilihan nama (link tanda tangan Pakta Integritas) — fix overlap NIP di mobile, tambah fitur cari nama, batasi tinggi daftar
 **Last agent:** Claude Sonnet 5 (Claude Code), via brainstorming → writing-plans → subagent-driven-development
-**Status:** COMPLETE (Task 1-7 dari plan selesai + review bersih) — build ✅, test 78/78 ✅, diverifikasi end-to-end (dropdown disable state di browser + PDF hasil ekspor sungguhan mengandung font `OpenSans-SemiBold`). Menunggu review akhir seluruh branch sebelum push/PR.
+**Status:** COMPLETE (Task 1-4 dari plan selesai + review bersih) — build ✅, test 83/83 ✅, review akhir Opus: "Ready to merge: Yes". Menunggu approval user untuk push/PR/merge.
+
+### Catatan penting soal branch ini
+
+Branch `claude/quizzical-elbakyan-b7f94e` sebelumnya sudah dipakai untuk fitur SemiBold font weight (lihat commit `785041e`..`d1b2d9a`), yang sudah di-merge ke `main` lewat [PR #23](https://github.com/starismaaw/Sertifikat-Generator/pull/23). Worktree ini melanjutkan memakai nama branch yang sama untuk fitur baru ini — jadi kalau membaca `git log` di branch ini, 6 commit SemiBold di awal riwayat BUKAN bagian dari fitur ini, itu riwayat lama yang sudah shipped. Base yang benar untuk fitur ini adalah `origin/main` di commit `9cd65d1` (tip main setelah PR #23 merge), bukan local `main` yang stale (`110d8a3`) atau `HEAD~1`.
+
+Local `main` ref di worktree ini TIDAK up to date dengan `origin/main` — jangan pakai `git merge-base main HEAD` untuk fitur berikutnya di branch ini tanpa `git fetch origin` dulu.
 
 ### Referensi
-- Spec: `docs/superpowers/specs/2026-07-01-semibold-font-weight-design.md`
-- Plan: `docs/superpowers/plans/2026-07-01-semibold-font-weight.md`
+- Spec: `docs/superpowers/specs/2026-07-01-pakta-signer-name-list-design.md`
+- Plan: `docs/superpowers/plans/2026-07-01-pakta-signer-name-list.md`
 
 ### Latar Belakang
-Sesi sebelumnya men-debug laporan user "output PDF Open Sans terlihat beda tebalnya dari Canva" — hasil investigasi: PDF sudah meng-embed font Open Sans asli dengan weight benar (bukan bug), perbedaan berasal dari rendering engine (anti-aliasing/hinting) yang berbeda antar viewer, bukan font salah. User kemudian minta ditambahkan opsi weight `SemiBold` sebagai pilihan baru di editor.
+User melaporkan 3 masalah di halaman publik `/#pakta/<eventId>` (step `pickName` di `PaktaSignPage.tsx`): (1) daftar peserta terlalu panjang ke bawah tanpa fitur cari, (2) angka NIP overlap dengan nama di mobile. Root cause overlap: `.apple-btn` (dipakai sebagai pil nama+NIP) punya `white-space: nowrap` dalam flex-row satu baris — nama panjang mendorong NIP keluar batas pil di layar sempit.
 
 ### Ringkasan Perubahan
-- `src/lib/fontRegistry.ts` — tambah `SemiBold`/`SemiBoldItalic` ke `FontWeight`/`FONT_WEIGHTS`, tambah flag `hasSemiBold` per family (`false` hanya untuk Lato — satu-satunya family tanpa cut 600 resmi di Google Fonts), tambah `WEIGHT_CSS` (map tunggal weight→{weight number, italic}) + `toKonvaFontStyle()` + `isWeightDisabled()`.
-- Konsolidasi: `EditorCanvas.tsx` & `CertPreviewMini.tsx` tadinya punya fungsi `konvaFontStyle()` duplikat identik — sekarang keduanya pakai `toKonvaFontStyle` dari fontRegistry. `pdfRenderer.ts`'s `toCssFont()` (di-export) sekarang pakai `WEIGHT_CSS` alih-alih switch bold/italic biner.
-- `FieldProperties.tsx` — dropdown weight men-disable SemiBold/SemiBoldItalic via `isWeightDisabled()` (mengganti logic inline lama yang cuma tahu Italic/BoldItalic).
-- `scripts/copy-fonts.mjs` — extend untuk copy file weight 600 dari `@fontsource/*` (bukan generate manual dari GitHub — file 600 sudah tersedia langsung di paket npm yang sudah ter-install). Menghasilkan 17 file baru di `public/fonts/` (8 family × 2 file SemiBold+SemiBoldItalic, Cinzel × 1 file SemiBold-only karena tidak punya italic sama sekali; Lato 0 file).
-- `index.html` — tambah weight `600` ke query Google Fonts untuk 9 family (bukan Lato), supaya preview browser tidak mensintesis weight 600 dari 400/700.
+- `src/lib/signerFilter.ts` (baru) — fungsi murni `matchesSignerQuery(nama, query)`: case-insensitive substring match, query kosong/whitespace = match semua.
+- `src/styles/apple-design.css` — tambah 6 class baru (append-only, tidak mengubah rule lama): `.sg-signer-item` (item dua-baris, flex-column — struktural tidak bisa overlap di lebar layar berapa pun), `.sg-signer-item-nama`, `.sg-signer-item-nip`, `.sg-signer-item-done`, `.sg-signer-toggle`, `.sg-signer-list-scroll` (max-height 400px + scroll).
+- `src/components/pakta-signer/PaktaSignPage.tsx` — step `pickName` diganti total: search box (state `query`), grup "Sudah menandatangani" jadi collapsed-by-default dengan toggle (state `showSudah`), daftar "Belum" dibungkus scroll container, `totalBelum`/`totalSudah` dihitung dari `signers` mentah (bukan hasil filter) supaya angka di judul stabil saat mengetik.
+- Step lain (`loading`, `notFound`, `signing`, `submitting`, `success`, `error`), `listSigners`/`getAcaraPakta`, dan dashboard admin — tidak disentuh, sesuai spec bagian "Hal yang Tidak Berubah".
 
 ### Files Changed
-- `src/lib/fontRegistry.ts`
-- `tests/fontRegistry.test.ts` (baru)
-- `src/components/editor/EditorCanvas.tsx`
-- `src/components/generate/CertPreviewMini.tsx`
-- `src/lib/pdfRenderer.ts`
-- `tests/pdfRenderer.test.ts`
-- `src/components/editor/FieldProperties.tsx`
-- `scripts/copy-fonts.mjs`
-- `public/fonts/*-SemiBold*.woff` (17 file baru, generated — bukan ditulis manual)
-- `index.html`
+- `src/lib/signerFilter.ts` (baru)
+- `tests/signerFilter.test.ts` (baru)
+- `src/styles/apple-design.css`
+- `src/components/pakta-signer/PaktaSignPage.tsx`
 
 ### Commands Run
-- `npx vitest run` — ✅ 78/78 pass (14 file test)
-- `npm run build` — ✅ 0 error (catatan: warning ukuran chunk >500kB sudah ada sebelum perubahan ini, tidak terkait)
-- Tidak ada script `npm run lint` di `package.json` (tidak tersedia di proyek ini — sama seperti sesi sebelumnya)
-- Verifikasi manual browser: dropdown weight di-disable dengan benar untuk Lato (SemiBold+SemiBoldItalic disabled), Cinzel (SemiBoldItalic disabled karena tidak ada italic sama sekali, SemiBold tetap aktif), Open Sans (semua aktif) — dicek langsung via DOM `option.disabled`.
-- Verifikasi manual network: response Google Fonts CSS2 untuk Cinzel & EB Garamond dikonfirmasi mengandung blok `@font-face { font-weight: 600; ... }` asli (bukan sintesis browser).
-- Verifikasi manual PDF: field dengan Font Family "Open Sans" + Weight "SemiBold" diekspor via alur Cetak → Unduh PDF sungguhan; byte PDF hasil unduhan diperiksa, resource font-nya bernama `/OpenSans-SemiBold-...` — konfirmasi pdf-lib benar-benar meng-embed file weight 600, bukan fallback diam-diam ke Helvetica.
+- `npx vitest run` — ✅ 83/83 pass (15 file test, naik dari 78 sebelum fitur ini)
+- `npm run build` — ✅ 0 error
+- Tidak ada script `npm run lint` di `package.json`
+- Verifikasi manual: TIDAK bisa lewat browser dengan data Supabase asli (tidak ada password admin pakta di sesi ini, tidak ada acara pakta dengan peserta yang bisa diakses untuk uji publik). Sebagai gantinya, controller menulis test render komponen sementara (`@testing-library/react`, mocking `paktaStore`) untuk memverifikasi DOM sungguhan: layout dua-baris (nama & NIP jadi `<span>` terpisah dengan class benar), search substring/case-insensitive dengan angka header stabil, pesan "tidak ada hasil", dan toggle grup "Sudah" default tertutup lalu expand/collapse. File test tersebut dihapus setelah dipakai — **bukan bagian dari deliverable plan**, murni verifikasi controller. Fix overlap NIP sendiri terverifikasi struktural lewat CSS (`flex-direction: column` tidak bisa overlap di lebar berapa pun, beda dari bug lama yang pakai `white-space: nowrap` dalam flex-row).
 
 ### Validation
 - Build: ✅ PASS
 - Lint: N/A (tidak ada script lint)
-- Test: ✅ 78/78 PASS
+- Test: ✅ 83/83 PASS
 
 ### Proses Eksekusi (Subagent-Driven Development)
-Task 1-6 (data model, refactor Konva, refactor pdfRenderer, UI dropdown, generate font asset, index.html) dikerjakan oleh implementer subagent terpisah (fresh context per task, model haiku karena brief berisi kode lengkap) + task reviewer subagent (model sonnet, spec compliance + code quality), semua lolos review "Approved" tanpa temuan Critical/Important. Task 4 dan Task 6 masing-masing punya langkah verifikasi manual berbasis browser yang tidak bisa dilakukan implementer (tidak punya browser tooling) — controller yang menjalankannya langsung. Task 7 (verifikasi end-to-end) dan dokumen ini dikerjakan langsung oleh controller. Ledger progres di `.superpowers/sdd/progress.md` (git-ignored, lokal ke worktree ini).
+Task 1-3 dikerjakan oleh implementer subagent (fresh context per task; Task 1 & 2 model haiku karena brief berisi kode lengkap, Task 3 model sonnet karena integrasi 3 edit ke satu file besar) + task reviewer subagent (model sonnet), semua lolos review "Approved" tanpa temuan Critical/Important. Task 4 (verifikasi manual, tidak bisa dilakukan implementer/reviewer karena butuh browser) dikerjakan langsung oleh controller. Final whole-branch review dijalankan model Opus: "Ready to merge: Yes". Ledger progres di `.superpowers/sdd/progress.md` (git-ignored, lokal ke worktree ini).
 
 Commit per task:
-1. `785041e` — tambah SemiBold/SemiBoldItalic ke font registry
-2. `a60f715` — pakai toKonvaFontStyle bersama, hapus duplikasi konvaFontStyle
-3. `bb114d2` — toCssFont pakai WEIGHT_CSS, tambah dukungan SemiBold
-4. `a5f7db2` — disable opsi SemiBold di dropdown untuk family tanpa dukungan
-5. `4e0d22f` — generate 17 file weight SemiBold dari @fontsource
-6. `d1b2d9a` — load weight 600 dari Google Fonts untuk preview SemiBold
+1. `68a0b2d` — tambah fungsi filter nama peserta
+2. `45d19f0` — tambah CSS item peserta dua-baris, toggle, scroll container
+3. `8e85a66` — tambah search, layout dua-baris, toggle sudah-TTD, scroll container
+
+(Base untuk fitur ini: `9cd65d1`, commit docs terakhir sebelum implementasi dimulai.)
 
 ### Known Issues
-- Selama investigasi ditemukan koreksi terhadap draf spec awal: asumsi awal bahwa file font di-generate manual dari `google/fonts` GitHub repo (via fonttools variable-font instancer) ternyata salah — file sebenarnya disalin dari paket npm `@fontsource/*` oleh `scripts/copy-fonts.mjs`. Spec sudah dikoreksi sebelum implementasi dimulai (lihat bagian "Koreksi dari draf awal" di spec doc).
-- Output test `vitest run` mengandung noise `Error: Not implemented: HTMLCanvasElement.prototype.getContext` dari jsdom — ini pre-existing (berasal dari `browserTextWidth()`'s try/catch di `pdfRenderer.ts`, sudah ada sebelum fitur ini, tidak terkait perubahan SemiBold), tertangkap dan tidak menggagalkan test, tapi bukan output yang benar-benar pristine.
+- Task reviewer (Minor, tidak blocking, konsisten dengan pola lama di file yang sama): `belum`/`sudah`/`totalBelum`/`totalSudah` masing-masing memanggil `signers.filter(...)` sendiri-sendiri (4 scan per render) alih-alih satu scan yang digunakan ulang. Ini pola yang sudah ditentukan verbatim di plan, bukan keputusan implementer.
+- Fix overlap NIP di mobile TIDAK diverifikasi dengan data Supabase riil di viewport asli — hanya diverifikasi struktural (CSS `flex-direction: column`) dan lewat DOM assertion di test komponen sementara. Kalau ingin verifikasi visual 100% end-to-end, perlu password admin pakta + acara dengan peserta ber-NIP panjang di viewport mobile sungguhan.
 
 ### Next Step
-- Jalankan review akhir seluruh branch (whole-branch code review) sebelum push/PR/merge.
-- Setelah review akhir bersih: tunggu approval user untuk commit/push/PR (belum ada yang di-push ke remote pada branch ini).
-- User disarankan mencoba fitur SemiBold di editor sungguhan (bukan hanya event sintetis yang dipakai untuk verifikasi) dan bandingkan hasil PDF dengan ekspektasi.
+- Menunggu approval user untuk push branch dan buat PR baru (branch ini sudah pernah di-PR-kan sekali untuk fitur SemiBold dan sudah di-merge — PR baru diperlukan untuk fitur ini).
+- Setelah user approve dan PR dibuat: user disarankan mencoba search & toggle di halaman `/#pakta/<eventId>` sungguhan, dan cek tampilan di HP asli untuk konfirmasi visual fix overlap NIP.
