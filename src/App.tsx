@@ -1,6 +1,7 @@
 import './styles/apple-design.css';
 import { useState } from 'react';
 import { useView } from './components/AppRouter';
+import { Hub } from './components/Hub';
 import { EventList } from './components/EventList';
 import { CertificateEditor } from './components/editor/CertificateEditor';
 import { GenerateView } from './components/generate/GenerateView';
@@ -45,15 +46,21 @@ export default function App() {
       ...(view.name === 'pakta-dashboard' ? [{ label: 'Dashboard', active: true as const }] : []),
     ];
     if (view.name === 'home') return [{ label: 'Beranda', active: true }];
+    if (view.name === 'sertifikat') return [
+      { label: 'Beranda', view: { name: 'home' } },
+      { label: 'Sertifikat Generator', active: true },
+    ];
     const ev = getEvent(view.eventId);
     const evLabel = ev?.nama ?? 'Kegiatan';
     if (view.name === 'editor') return [
       { label: 'Beranda', view: { name: 'home' } },
+      { label: 'Sertifikat Generator', view: { name: 'sertifikat' } },
       { label: evLabel, view: { name: 'generate', eventId: view.eventId } },
       { label: 'Editor templat', active: true },
     ];
     if (view.name === 'generate') return [
       { label: 'Beranda', view: { name: 'home' } },
+      { label: 'Sertifikat Generator', view: { name: 'sertifikat' } },
       { label: evLabel, active: true },
     ];
     return [{ label: 'Beranda', active: true }];
@@ -67,7 +74,8 @@ export default function App() {
           saveState={view.name === 'editor' ? saveState : 'synced'}
         />
         {isPaktaView && <PaktaAdminRoot />}
-        {!isPaktaView && view.name === 'home' && <EventList />}
+        {!isPaktaView && view.name === 'home' && <Hub />}
+        {!isPaktaView && view.name === 'sertifikat' && <EventList />}
         {!isPaktaView && view.name === 'editor' && <CertificateEditor key={view.eventId} eventId={view.eventId} />}
         {!isPaktaView && view.name === 'generate' && <GenerateView key={view.eventId} eventId={view.eventId} />}
       </div>
