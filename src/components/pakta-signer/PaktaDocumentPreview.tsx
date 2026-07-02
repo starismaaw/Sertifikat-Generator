@@ -1,50 +1,65 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type CSSProperties } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { Field, FieldValues, PaktaTemplate } from '../../types';
 import { WEIGHT_CSS } from '../../lib/fontRegistry';
-import { computeScale, computeSignatureBox, fitFontSizeCss } from '../../lib/paktaPreviewLayout';
+import { computeScale, computeSignatureBox, fitFontSizeCss, measureFontAscent } from '../../lib/paktaPreviewLayout';
 import { SignaturePad, type SignaturePadHandle } from './SignaturePad';
 
-function textStyle(field: Field, scale: number, text: string): CSSProperties {
+/**
+ * Satu baris teks field, dirender sebagai SVG <text> diposisikan lewat baseline
+ * (bukan <div>/<span> HTML biasa). Ini penting: CSS line-height/kotak baris TIDAK
+ * bisa dipakai untuk menempatkan glyph presisi di field.y (top kotak) — font
+ * seperti Inter punya metrik ascent+descent bawaan jauh lebih besar dari 1em,
+ * jadi walau line-height:1 diset, teks tetap tampak turun beberapa px (dikonfirmasi
+ * manual: gap tidak berubah sama sekali walau line-height diubah 1.6 -> 1). SVG
+ * text baseline (y = ascent yang diukur canvas) presisi 1:1, sama seperti Konva
+ * Text & pdfRenderer.ts (keduanya ascent-based, bukan line-box-based).
+ *
+ * formatter (mis. uppercase) sengaja tidak diterapkan: pdfRenderer.ts juga tidak
+ * menerapkannya untuk Pakta, supaya preview identik dengan PDF akhir.
+ */
+function FieldLine({
+  field, scale, text, top, underline,
+}: {
+  field: Field; scale: number; text: string; top: number; underline?: boolean;
+}) {
+  if (!text) return null;
   const { weight, italic } = WEIGHT_CSS[field.fontWeight];
-  const size = fitFontSizeCss(text, {
+  const w = field.lebar * scale;
+  const fontSize = fitFontSizeCss(text, {
     fontFamily: field.fontFamily,
     fontWeight: field.fontWeight,
     ukuran: field.ukuran * scale,
-    lebar: field.lebar * scale,
+    lebar: w,
   });
-  return {
-    fontFamily: `"${field.fontFamily}"`,
-    fontWeight: weight,
-    fontStyle: italic ? 'italic' : 'normal',
-    fontSize: size,
-    color: field.warna,
-    // fitFontSizeCss menghitung ukuran agar teks satu baris muat dalam field.lebar,
-    // tapi pengukuran canvas vs layout DOM bisa beda sub-pixel — nowrap mencegah
-    // teks pecah ke baris baru (PDF akhir selalu satu baris; lihat overflow:hidden
-    // di wrapper div pemanggil untuk pengaman sisa sub-pixel).
-    whiteSpace: 'nowrap',
-  };
+  const ascent = measureFontAscent(field.fontFamily, field.fontWeight, fontSize);
+  const x = field.perataan === 'center' ? w / 2 : field.perataan === 'right' ? w : 0;
+  const textAnchor = field.perataan === 'center' ? 'middle' : field.perataan === 'right' ? 'end' : 'start';
+  return (
+    <svg
+      style={{ position: 'absolute', left: field.x * scale, top, overflow: 'visible' }}
+      width={w}
+      height={fontSize * 2}
+    >
+      <text
+        x={x}
+        y={ascent}
+        textAnchor={textAnchor}
+        fontFamily={`"${field.fontFamily}"`}
+        fontWeight={weight}
+        fontStyle={italic ? 'italic' : 'normal'}
+        fontSize={fontSize}
+        fill={field.warna}
+        textDecoration={underline ? 'underline' : undefined}
+      >
+        {text}
+      </text>
+    </svg>
+  );
 }
 
-/** Field teks biasa (nama, nip, jabatan, tanggal, dst) — satu baris.
- *  formatter (mis. uppercase) sengaja tidak diterapkan: pdfRenderer.ts juga tidak
- *  menerapkannya untuk Pakta, supaya preview identik dengan PDF akhir. */
+/** Field teks biasa (nama, nip, jabatan, tanggal, dst) — satu baris. */
 function TextFieldOverlay({ field, scale, text }: { field: Field; scale: number; text: string }) {
-  if (!text) return null;
-  return (
-    <div
-      style={{
-        position: 'absolute',
-        left: field.x * scale,
-        top: field.y * scale,
-        width: field.lebar * scale,
-        textAlign: field.perataan,
-        overflow: 'hidden',
-      }}
-    >
-      <span style={textStyle(field, scale, text)}>{text}</span>
-    </div>
-  );
+  return <FieldLine field={field} scale={scale} text={text} top={field.y * scale} />;
 }
 
 /** Field gabungan Nama & NIP: baris nama bergaris bawah, lalu "NIP. <nip>" di bawahnya. */
@@ -54,30 +69,8 @@ function NamaNipOverlay({ field, scale, nama, nip }: { field: Field; scale: numb
   const nipText = `NIP. ${nip}`;
   return (
     <>
-      <div
-        style={{
-          position: 'absolute',
-          left: field.x * scale,
-          top: field.y * scale,
-          width: field.lebar * scale,
-          textAlign: field.perataan,
-          overflow: 'hidden',
-        }}
-      >
-        <span style={{ ...textStyle(field, scale, nama), textDecoration: 'underline' }}>{nama}</span>
-      </div>
-      <div
-        style={{
-          position: 'absolute',
-          left: field.x * scale,
-          top: field.y * scale + lineHeight,
-          width: field.lebar * scale,
-          textAlign: field.perataan,
-          overflow: 'hidden',
-        }}
-      >
-        <span style={textStyle(field, scale, nipText)}>{nipText}</span>
-      </div>
+      <FieldLine field={field} scale={scale} text={nama} top={field.y * scale} underline />
+      <FieldLine field={field} scale={scale} text={nipText} top={field.y * scale + lineHeight} />
     </>
   );
 }
