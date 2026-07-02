@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { forwardRef, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
 import type { Field, FieldValues, PaktaTemplate } from '../../types';
 import { WEIGHT_CSS } from '../../lib/fontRegistry';
 import { computeScale, computeSignatureBox, fitFontSizeCss, measureFontAscent } from '../../lib/paktaPreviewLayout';
@@ -95,7 +95,7 @@ export const PaktaDocumentPreview = forwardRef<SignaturePadHandle, PaktaDocument
     const [scale, setScale] = useState(1);
     const [hasSignature, setHasSignature] = useState(false);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
       const el = containerRef.current;
       if (!el) return;
       function update() {

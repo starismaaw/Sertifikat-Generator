@@ -203,12 +203,18 @@ export async function renderPakta(
     if (field.tipe === 'tandaTangan') {
       if (!sigImage) continue;
       const h = field.tinggi ?? field.lebar / 2;
-      // field.y = TOP kotak; konversi ke origin bawah pdf-lib.
+      // Scale seragam (contain-fit, bukan stretch-fill) supaya tanda tangan tidak
+      // melar/gepeng saat rasio kotak gambar interaktif (mis. persegi di mobile,
+      // lihat computeSignatureBox di paktaPreviewLayout.ts) berbeda dari rasio
+      // field asli. Lihat docs/superpowers/specs/2026-07-02-pakta-signature-natural-fit-design.md.
+      const { width: w, height: hh } = sigImage.scaleToFit(field.lebar, h);
+      // field.y = TOP kotak; konversi ke origin bawah pdf-lib. Gambar dipusatkan
+      // di dalam kotak field pada sumbu yang tidak jadi faktor pembatas scale.
       page.drawImage(sigImage, {
-        x: field.x,
-        y: template.bgHeight - field.y - h,
-        width: field.lebar,
-        height: h,
+        x: field.x + (field.lebar - w) / 2,
+        y: template.bgHeight - field.y - h + (h - hh) / 2,
+        width: w,
+        height: hh,
       });
       continue;
     }

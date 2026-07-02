@@ -138,12 +138,13 @@ describe('renderPakta', () => {
     expect(bytes.byteLength).toBeGreaterThan(100);
   });
 
-  it('menempatkan PNG tanda tangan pada koordinat field yang benar', async () => {
-    // x=50, y=100, lebar=300, tinggi=150, bgHeight=600
-    // y_pdf = bgHeight - y - tinggi = 600 - 100 - 150 = 350
-    // pdf-lib decomposes drawImage into stacked cm operators:
-    //   "1 0 0 1 50 350 cm"  ← translation to (x=50, y_pdf=350)
-    //   "300 0 0 150 0 0 cm" ← scale to (width=300, height=150)
+  it('menempatkan PNG tanda tangan proporsional (contain-fit) & terpusat saat rasio gambar beda dari rasio field', async () => {
+    // Gambar sumber PNG_1x1 persegi (1x1) dimasukkan ke field lebar-pendek (300x150).
+    // scaleToFit(300, 150) pada gambar 1x1: imgWidthScale=300, imgHeightScale=150,
+    // scale=min(300,150)=150 -> hasil 150x150 (persegi, TIDAK stretch jadi 300x150).
+    // Dipusatkan secara horizontal (sumbu yang tidak jadi faktor pembatas):
+    //   x = field.x + (field.lebar - 150)/2 = 50 + 75 = 125
+    //   y_pdf = bgHeight - field.y - h + (h - hh)/2 = 600-100-150 + (150-150)/2 = 350
     const tpl = makePaktaTemplate([
       { id: 's1', tipe: 'tandaTangan', x: 50, y: 100, lebar: 300, tinggi: 150,
         fontFamily: 'Playfair Display', fontWeight: 'Regular',
@@ -152,10 +153,41 @@ describe('renderPakta', () => {
     const bytes = await renderPakta(tpl, {}, PNG_1x1);
     const doc = await PDFDocument.load(bytes);
     const content = await pageContentText(doc);
-    // Y-flip formula: bgHeight(600) - y(100) - tinggi(150) = 350
-    // Verify translation (x, y_pdf) and scale (width, height) are present
-    expect(content).toContain('1 0 0 1 50 350 cm');
-    expect(content).toContain('300 0 0 150 0 0 cm');
+    expect(content).toContain('1 0 0 1 125 350 cm');
+    expect(content).toContain('150 0 0 150 0 0 cm');
+    // Tidak boleh lagi mengandung stretch lama (300x150 non-uniform)
+    expect(content).not.toContain('300 0 0 150 0 0 cm');
+  });
+
+  it('tidak mengubah hasil saat rasio gambar sudah sama dengan rasio field (tidak regresi)', async () => {
+    // Field persegi (200x200) + gambar persegi (PNG_1x1, 1x1) -> scaleToFit tidak
+    // perlu memusatkan apa pun (w=200=field.lebar, hh=200=h), identik dengan
+    // stretch-fill lama untuk kasus rasio yang sudah cocok (mis. desktop).
+    const tpl = makePaktaTemplate([
+      { id: 's1', tipe: 'tandaTangan', x: 50, y: 100, lebar: 200, tinggi: 200,
+        fontFamily: 'Playfair Display', fontWeight: 'Regular',
+        ukuran: 12, warna: '#000000', perataan: 'left', formatter: 'none' },
+    ]);
+    const bytes = await renderPakta(tpl, {}, PNG_1x1);
+    const doc = await PDFDocument.load(bytes);
+    const content = await pageContentText(doc);
+    expect(content).toContain('1 0 0 1 50 300 cm');
+    expect(content).toContain('200 0 0 200 0 0 cm');
+  });
+
+  it('memakai fallback tinggi (lebar/2) sebagai tinggi kotak untuk scaleToFit saat field.tinggi tidak diisi', async () => {
+    // field.tinggi tidak diisi -> h fallback = field.lebar/2 = 300/2 = 150, sama
+    // persis dengan test contain-fit di atas -> hasil harus identik (125, 350, 150x150).
+    const tpl = makePaktaTemplate([
+      { id: 's1', tipe: 'tandaTangan', x: 50, y: 100, lebar: 300,
+        fontFamily: 'Playfair Display', fontWeight: 'Regular',
+        ukuran: 12, warna: '#000000', perataan: 'left', formatter: 'none' },
+    ]);
+    const bytes = await renderPakta(tpl, {}, PNG_1x1);
+    const doc = await PDFDocument.load(bytes);
+    const content = await pageContentText(doc);
+    expect(content).toContain('1 0 0 1 125 350 cm');
+    expect(content).toContain('150 0 0 150 0 0 cm');
   });
 
   it('field namaNip: menggambar 2 baris teks + 1 garis bawah saat nama & NIP terisi', async () => {
