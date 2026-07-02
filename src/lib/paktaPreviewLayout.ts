@@ -23,17 +23,27 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 /**
- * Kotak tanda tangan interaktif, hasil scale field 'tandaTangan' dengan batas
- * bawah ukuran MIN_SIGNATURE_HEIGHT. Bila kotak hasil scale lebih kecil dari batas,
- * kotak dibesarkan proporsional (mempertahankan rasio lebar:tinggi asli) dan
- * dipusatkan pada titik tengah kotak aslinya, lalu di-clamp agar tidak keluar
- * dari batas dokumen (mis. field yang dekat pojok kiri/atas).
+ * Kotak tanda tangan interaktif, hasil scale field 'tandaTangan'.
  *
- * Pembesaran itu sendiri juga dibatasi supaya kotak tidak pernah melebihi lebar/
- * tinggi dokumen (containerW/containerH) — di layar sempit dengan field kecil,
- * growFactor untuk mencapai MIN_SIGNATURE_HEIGHT bisa membuat width jauh lebih
- * lebar dari dokumen itu sendiri. Bila dibatasi, tinggi akhir boleh kurang dari
- * MIN_SIGNATURE_HEIGHT — lebih baik daripada kotak "melebar keluar dari template".
+ * Tinggi SELALU diusahakan mencapai MIN_SIGNATURE_HEIGHT (supaya nyaman digambar
+ * dengan jari) — hanya dibatasi containerH bila dokumen itu sendiri lebih pendek
+ * dari itu (kasus langka). Lebar dibesarkan proporsional mengikuti pertumbuhan
+ * tinggi (mempertahankan rasio lebar:tinggi asli field bila memungkinkan), tapi
+ * DIBATASI TERPISAH agar tidak pernah melebihi lebar dokumen (containerW).
+ *
+ * Catatan: tinggi & lebar dibatasi secara TERPISAH (bukan satu growFactor
+ * bersama) supaya field TTD yang lebar-tapi-pendek (umum untuk area tanda
+ * tangan bergaya garis) tidak membuat tinggi ikut terpepet kecil hanya karena
+ * lebarnya kena batas dokumen di layar sempit — sebelumnya ini menyebabkan
+ * kotak gambar jadi sangat cebol (mis. 105px, bukan 140px) di mobile, sehingga
+ * tanda tangan yang digambar terlihat kecil/renggang saat di-stretch ke ukuran
+ * field asli di PDF akhir. Trade-off: rasio kotak di layar bisa sedikit beda
+ * dari field.lebar:tinggi saat lebar kena batas — dampaknya sekadar sedikit
+ * peregangan proporsi coretan tanda tangan, jauh lebih dapat diterima daripada
+ * area gambar yang terlalu sempit.
+ *
+ * Posisi (left/top) tetap dipusatkan pada titik tengah kotak field aslinya,
+ * lalu di-clamp agar tidak keluar dari batas dokumen (mis. field dekat pojok).
  */
 export function computeSignatureBox(
   field: Pick<Field, 'x' | 'y' | 'lebar' | 'tinggi'>,
@@ -49,13 +59,12 @@ export function computeSignatureBox(
   const containerW = bgWidth * scale;
   const containerH = bgHeight * scale;
 
-  const growFactorForHeight = rawHeight > 0 ? Math.max(1, MIN_SIGNATURE_HEIGHT / rawHeight) : 1;
-  const growFactorWidthCap = rawWidth > 0 ? containerW / rawWidth : growFactorForHeight;
-  const growFactorHeightCap = rawHeight > 0 ? containerH / rawHeight : growFactorForHeight;
-  const growFactor = Math.max(1, Math.min(growFactorForHeight, growFactorWidthCap, growFactorHeightCap));
+  const targetHeight = Math.max(rawHeight, MIN_SIGNATURE_HEIGHT);
+  const height = Math.min(targetHeight, containerH);
 
-  const width = rawWidth * growFactor;
-  const height = rawHeight * growFactor;
+  const heightGrowFactor = rawHeight > 0 ? height / rawHeight : 1;
+  const proportionalWidth = rawWidth * heightGrowFactor;
+  const width = Math.min(proportionalWidth, containerW);
 
   const centerX = rawLeft + rawWidth / 2;
   const centerY = rawTop + rawHeight / 2;
