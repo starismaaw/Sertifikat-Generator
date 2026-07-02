@@ -1,80 +1,79 @@
 ## Agent Handoff
 
-**Branch:** `claude/quizzical-elbakyan-b7f94e`
-**Task:** Unduh massal (ZIP) PDF di dashboard admin pakta + perbaikan overlap layout mobile di halaman admin
-**Last agent:** Claude Sonnet 5 (Claude Code), via brainstorming → writing-plans → subagent-driven-development (bulk download) + direct bugfix (mobile layout)
-**Status:** COMPLETE (Task 1-3 dari plan bulk-download selesai + review bersih, mobile fix diverifikasi live-browser) — build ✅, test 89/89 ✅, review akhir Opus: "Ready to merge: Yes". Menunggu approval user untuk push/PR/merge.
-
-### Catatan penting soal branch ini
-
-Branch `claude/quizzical-elbakyan-b7f94e` sudah dipakai berulang kali di worktree ini untuk fitur-fitur berbeda, masing-masing sudah di-PR-kan dan di-merge terpisah:
-- SemiBold font weight → [PR #23](https://github.com/starismaaw/Sertifikat-Generator/pull/23), merged.
-- Perbaikan daftar nama halaman link tanda tangan (search, layout, scroll) → [PR #24](https://github.com/starismaaw/Sertifikat-Generator/pull/24), merged.
-- Progress bertahap submit + unduh PDF halaman sukses → [PR #25](https://github.com/starismaaw/Sertifikat-Generator/pull/25), merged.
-- Reset tanda tangan + search dashboard admin → [PR #26](https://github.com/starismaaw/Sertifikat-Generator/pull/26), merged.
-- Fitur di handoff ini (unduh massal ZIP + fix mobile overlap) → **belum di-PR-kan**, ini yang perlu di-PR berikutnya.
-
-Base yang benar untuk fitur ini adalah `origin/main` di commit `4993f6d` (tip main setelah PR #26 merge). Local `main` ref di worktree ini masih TIDAK up to date dengan `origin/main` — selalu `git fetch origin` dulu sebelum menghitung `git merge-base` untuk fitur berikutnya di branch ini.
+**Branch:** `claude/gallant-lovelace-b6d0ac`
+**Task:** Redesain halaman awal jadi Landing Hub netral (2 kartu setara: Sertifikat Generator & Pakta Integritas) — user melapor halaman awal membingungkan, tidak jelas mana menu ke Sertifikat Generator dan mana ke Pakta Integritas.
+**Last agent:** Claude Sonnet 5 (Claude Code), via brainstorming → writing-plans → subagent-driven-development
+**Status:** Task 1-6 dari plan selesai + semua review task bersih (0 Critical/Important di semua 5 task). Build ✅, test 97/97 ✅, manual browser verification ✅ (desktop + mobile). Final whole-branch review BELUM dijalankan. Menunggu approval user untuk push/PR/merge.
 
 ### Referensi
-- Spec: `docs/superpowers/specs/2026-07-02-pakta-dashboard-bulk-download-design.md`
-- Plan: `docs/superpowers/plans/2026-07-02-pakta-dashboard-bulk-download.md`
-- Mobile fix TIDAK melalui brainstorming/plan formal (bug fix langsung sesuai instruksi user + aturan proyek "just fix it") — root cause & bukti visual didokumentasikan di pesan commit `4f26d0a`.
+- Spec: `docs/superpowers/specs/2026-07-02-landing-hub-design.md`
+- Plan: `docs/superpowers/plans/2026-07-02-landing-hub.md`
+- Ledger progres SDD: `.superpowers/sdd/progress.md`
 
 ### Latar Belakang
-User minta dua hal dalam satu sesi: (1) fitur unduh massal PDF di dashboard admin (skala nyata: ~150 pegawai per acara — jadi desain HARUS menghindari 150 panggilan terpisah ke Vercel), dan (2) perbaikan overlap/tampilan berantakan di halaman admin pakta versi mobile.
+User: "Halaman awal aplikasi terlihat membingungkan, belum terlihat jelas mana menu untuk menuju ke sertifikat generator dan mana menu untuk ke pakta integritas." Audit menemukan halaman `home` sebelumnya langsung merender daftar kegiatan sertifikat (`EventList`), dengan tombol "Pakta Integritas" ditaruh sebagai pill kecil sejajar tombol aksi biasa — tidak ada isyarat visual bahwa itu pintu masuk ke modul terpisah (dengan sistem login admin sendiri).
 
-### Ringkasan Perubahan — Unduh Massal ZIP
-- `api/pakta-admin.ts` — action baru `get_bulk_signed_urls`: terima `{ paths: string[] }`, loop DI SERVER (satu invocation) memanggil `createSignedUrl` untuk tiap path, kembalikan `{ urls: Record<path, signedUrl> }` sekali jalan. Ini yang memangkas 150 potensi request jadi 1. Gagal total (500) kalau ada satu path yang gagal — tidak ada partial result.
-- `src/components/pakta-admin/PaktaDashboard.tsx`:
-  - Tombol "Unduh Semua (ZIP)", disabled kalau `sudahCount === 0` atau proses sedang berjalan.
-  - `downloadAllPdfs()` — satu panggilan `get_bulk_signed_urls`, lalu ambil byte tiap PDF via worker pool concurrency 5 (`BULK_CONCURRENCY`), hasil ditulis ke `files[index]` (bukan `.push()`) supaya urutan ZIP konsisten walau fetch paralel selesai tidak berurutan.
-  - Progress dua fase: `fetching` (persentase asli) → `zipping` (indeterminate), reuse `.apple-progress*` CSS yang sudah ada (dipakai juga di fitur progress submit tanda tangan) — tidak ada CSS baru.
-  - Reuse `buildZip`/`downloadBlob` dari `src/lib/download.ts` (sudah dipakai fitur generate massal sertifikat) — tidak dimodifikasi.
+Brainstorming dengan user menghasilkan 3 opsi (hub netral / hub+shortcut terakhir dibuka / sidebar app-switcher permanen). User memilih **hub netral** — dua kartu besar setara, isi kartu **ikon + nama saja** (tanpa deskripsi/statistik, preferensi eksplisit user untuk minimalis).
 
-### Ringkasan Perubahan — Fix Overlap Mobile
-Root cause: `.sg-btn`/`.apple-btn` sengaja `white-space: nowrap`, tapi container yang menampung tombol di sebelah judul/nama acara tidak punya `flexWrap`/`minWidth: 0` — akibatnya di mobile, baris tidak bisa menyusut/melipat, dan overflow-nya menyeret SELURUH HALAMAN melebar horizontal (bukan cuma baris tombolnya).
-- `src/components/pakta-admin/AdminLogin.tsx` — `.apple-card-header` (flex row space-between) salah dipakai untuk pasangan judul+deskripsi (satu-satunya pemakaian class ini di seluruh codebase, dikonfirmasi lewat grep) — diganti div biasa yang menumpuk vertikal.
-- `src/components/pakta-admin/PaktaEventList.tsx` — header (judul + 2 tombol) dan kartu acara (info + 5 tombol) ditambah `flexWrap: 'wrap'`, `minWidth` pada kolom info, `overflowWrap: 'break-word'` pada nama acara.
-- `src/components/pakta-admin/PaktaDashboard.tsx` — header (tombol Kembali + judul acara) dan baris tombol aksi ditambah `flexWrap: 'wrap'`, `minWidth: 0` + `overflowWrap: 'break-word'` pada judul.
-- Diverifikasi lewat browser preview sungguhan (bukan jsdom) dengan mock `window.fetch` (tidak ada akses admin/Supabase sungguhan di sandbox ini) — konfirmasi `document.documentElement.scrollWidth === window.innerWidth` sebelum vs sesudah (sebelumnya jauh lebih lebar dari viewport, sesudah sama persis).
+### Ringkasan Perubahan
+- `src/components/AppRouter.tsx` — tambah view `{ name: 'sertifikat' }` (hash `#sertifikat`); `parseHash` diekspor (sebelumnya privat) supaya unit-testable.
+- `src/components/Hub.tsx` (baru) — 2 kartu `<button>` asli (bukan `div onClick`, untuk aksesibilitas keyboard/screen-reader native): "Sertifikat Generator" → `navigate({name:'sertifikat'})`, "Pakta Integritas" → `navigate({name:'pakta-admin'})`. Styling reuse token `sg-*`/`apple-design.css` yang sudah ada (tidak ada bahasa desain baru).
+- `src/components/AppTopbar.tsx` — logo "S" diubah dari `<div>` statis jadi `<button aria-label="Beranda">` yang navigasi ke Hub (pola standar "klik logo = pulang ke beranda").
+- `src/App.tsx` — `view.name==='home'` sekarang render `<Hub/>` (bukan lagi `EventList`), `view.name==='sertifikat'` render `<EventList/>`. Breadcrumb diperluas: alur sertifikat sekarang `Beranda → Sertifikat Generator → [nama kegiatan] → ...` (sebelumnya langsung `Beranda → [nama kegiatan]`); alur Pakta Integritas TIDAK berubah.
+- `src/components/EventList.tsx` — tombol "Pakta Integritas" dihapus (sudah redundan, jalur ke modul itu sekarang lewat Hub/breadcrumb).
 
 ### Files Changed
-- `api/pakta-admin.ts`
-- `tests/paktaAdmin.test.ts`
-- `src/components/pakta-admin/PaktaDashboard.tsx`
-- `src/components/pakta-admin/AdminLogin.tsx`
-- `src/components/pakta-admin/PaktaEventList.tsx`
+- `src/components/AppRouter.tsx`
+- `src/components/Hub.tsx` (baru)
+- `src/components/AppTopbar.tsx`
+- `src/App.tsx`
+- `src/components/EventList.tsx`
+- `src/styles/apple-design.css`
+- `tests/appRouter.test.ts` (baru)
+- `tests/Hub.test.tsx` (baru — component test pertama di repo ini yang pakai `@testing-library/react`)
+- `tests/AppTopbar.test.tsx` (baru)
 
 ### Commands Run
-- `npx vitest run` — ✅ 89/89 pass (86 baseline + 3 test baru untuk `get_bulk_signed_urls`)
-- `npm run build` — ✅ 0 error
-- Verifikasi manual unduh massal: render test sementara (`@testing-library/react`, mocking context/qrcode/modal/fetch), dikonfirmasi `get_bulk_signed_urls` benar-benar dipanggil SATU kali (bukan per-peserta), ZIP blob bertipe `application/zip` terbentuk, tombol disabled saat tidak ada peserta "sudah". Dihapus setelah dipakai.
-- Verifikasi manual mobile fix: browser preview sungguhan (bukan jsdom), mock fetch, walk-through login → daftar acara → dashboard di viewport sempit, screenshot sebelum/sesudah.
+- `npm run test` — ✅ 97/97 pass (18 file test, termasuk 3 file baru). Ada stderr noise dari `HTMLCanvasElement.getContext` di `tests/pdfRenderer.test.ts` — pre-existing (jsdom tidak implementasi canvas), TIDAK terkait perubahan sesi ini, test tetap PASS.
+- `npm run build` — ✅ 0 error. Ada warning ukuran chunk >500kB — pre-existing, bundle sudah besar sebelum perubahan ini.
+- `npm run lint` — **tidak ada script lint di package.json ini** (bukan gap dari sesi ini, sudah begitu sejak awal).
+- `npx tsc -b --noEmit` — gagal dengan `TS6310` (composite project + `--noEmit` tidak kompatibel dengan referenced project `tsconfig.node.json`) — **ini bukan bug dari perubahan sesi ini**, murni ketidakcocokan command dengan struktur tsconfig repo ini. Verifikasi type-check sesungguhnya pakai `npx tsc -b` (persis command yang dipakai `npm run build`) — ✅ 0 error.
+- Manual browser verification (preview tool, bukan Bash): Hub tampil 2 kartu di desktop & mobile (375×812, stack vertikal tanpa overlap) → klik kartu Sertifikat Generator masuk ke daftar kegiatan dengan breadcrumb `Beranda → Sertifikat Generator` → klik "Beranda" di breadcrumb kembali ke Hub → klik kartu Pakta Integritas masuk ke halaman login admin dengan breadcrumb `Beranda → Pakta Integritas`, tidak overlap di mobile → kartu Hub bisa di-fokus via keyboard (native `<button>`) → tidak ada console error.
 
 ### Validation
 - Build: ✅ PASS
-- Lint: N/A (tidak ada script lint)
-- Test: ✅ 89/89 PASS
+- Lint: N/A (tidak ada script lint di proyek ini)
+- Test: ✅ 97/97 PASS
 
 ### Proses Eksekusi
-Bulk download: Subagent-Driven Development — Task 1 (backend TDD, model haiku), Task 2 (frontend concurrency/worker-pool, model sonnet karena ada logic non-trivial) masing-masing implementer terpisah + task reviewer (model sonnet), lolos "Approved" tanpa temuan Critical/Important. Task 3 (verifikasi manual) dikerjakan controller. Final whole-branch review model Opus mencakup KEDUA perubahan (bulk download + mobile fix, karena mobile fix belum pernah direview formal sebelumnya) — "Ready to merge: Yes". Mobile fix sendiri dikerjakan controller langsung (bug fix, bukan lewat plan) sebelum Task 1 bulk-download dimulai, di-commit terpisah supaya tidak tercampur dengan commit fitur. Ledger progres di `.superpowers/sdd/progress.md`.
+Subagent-Driven Development, 5 task implementasi + 1 task verifikasi:
+- Task 1 (router) — implementer model haiku, reviewer model sonnet, Approved (1 catatan Minor kosmetik).
+- Task 2 (Hub.tsx + CSS) — implementer haiku, reviewer sonnet, Approved (1 catatan Minor kosmetik).
+- Task 3 (topbar logo) — implementer haiku, reviewer sonnet, Approved (2 catatan Minor).
+- Task 4 (wiring App.tsx + breadcrumb) — implementer haiku, reviewer sonnet, Approved (1 catatan Minor soal command tsc, sudah diverifikasi controller — bukan bug nyata).
+- Task 5 (hapus tombol lama EventList) — implementer haiku, reviewer sonnet, Approved (0 catatan).
+- Task 6 (full suite/build/lint/manual verification) — dikerjakan langsung oleh controller (bukan subagent, karena tidak ada perubahan kode untuk didelegasikan).
 
-Commit:
-1. `4f26d0a` — fix(pakta-admin): perbaiki overlap layout di mobile
-2. `51f7703` — feat(pakta-admin): tambah action get_bulk_signed_urls untuk unduh massal
-3. `dd2fa34` — feat(pakta-admin): tambah unduh massal ZIP di dashboard
+Tidak ada Critical/Important di seluruh 5 task review. Final whole-branch review (dispatch terpisah, model paling capable) BELUM dijalankan — ini next step sebelum PR.
 
-(Base untuk fitur ini: `4993f6d`, commit terakhir sebelum implementasi dimulai.)
+Ledger progres lengkap: `.superpowers/sdd/progress.md`.
+
+Commit (urutan kronologis):
+1. `830de31` — feat(router): add sertifikat view for the landing hub redesign
+2. `37d7fb5` — feat(hub): add Landing Hub component with Sertifikat/Pakta cards
+3. `4bff1a6` — feat(topbar): make logo a button that navigates to the hub
+4. `34a96f2` — feat(app): render Hub on home and move EventList to the sertifikat view
+5. `35b5a60` — chore(event-list): remove Pakta Integritas button, now handled by the Hub
+
+(Base untuk fitur ini: `b46dd81`, tip `main` sebelum implementasi dimulai — juga tip cabang ini sebelum Task 1.)
 
 ### Known Issues
-- **Minor, dari final review (belum diperbaiki, perlu keputusan user):** nama file di dalam ZIP (`pakta-<nama>.pdf`) TIDAK di-dedupe — kalau ada 2 peserta dengan nama persis sama, JSZip akan diam-diam menimpa file yang lebih dulu, sehingga ZIP berisi lebih sedikit file dari jumlah peserta "sudah" sebenarnya. Untuk acara pemerintah ~150 pegawai, nama kembar penuh cukup mungkin terjadi. Belum di-fix di sesi ini — kalau mau diperbaiki, opsi paling sederhana adalah menambah NIP ke nama file (`pakta-<nama>-<nip>.pdf`).
-- Minor (sudah diketahui sejak review Task 1-2): loop signed-URL backend sekuensial (bukan `Promise.all`) — cukup untuk tujuan spec (1 invocation, bukan N), tapi bisa lambat kalau someday perlu >150 file dalam satu batch. `bulkCurrentName` di UI progress bisa "lompat-lompat" karena 5 worker paralel — kosmetik saja, angka `X dari Y` tetap akurat.
-- `.apple-card-header` sekarang jadi dead CSS (tidak dipakai komponen manapun lagi setelah AdminLogin.tsx diubah) — bisa dibersihkan di sesi lain, tidak mendesak.
-- Fitur unduh massal TIDAK diverifikasi dengan 150 file PDF sungguhan / performa jaringan Supabase nyata — hanya diverifikasi lewat mock (di luar jangkauan test unit/komponen).
-- Fix mobile TIDAK diverifikasi dengan data Supabase riil di HP sungguhan (sama seperti sesi-sesi sebelumnya — tidak ada akses password admin pakta atau acara dengan peserta untuk uji end-to-end).
+- Bookmark/link lama ke root (`#` kosong) sekarang mendarat di Hub, bukan langsung ke daftar sertifikat — perubahan perilaku yang disengaja (tujuan redesign), bukan regresi, sudah didokumentasikan di spec bagian "Non-Tujuan/Perilaku Baru".
+- Belum ada test otomatis untuk `App.tsx` (breadcrumb wiring) dan `EventList.tsx` (penghapusan tombol) — sesuai keputusan eksplisit di plan, karena `App.tsx` menarik context Supabase-backed yang membuat unit test tidak proporsional untuk perubahan sekecil ini. Diverifikasi manual lewat browser preview (lihat Commands Run di atas).
+- `npx tsc -b --noEmit` (command yang awalnya ditulis di plan Task 4 sebagai verifikasi) tidak bisa dijalankan di repo ini karena error `TS6310` yang sudah ada sebelum sesi ini (bukan disebabkan perubahan Landing Hub) — dicatat di sini supaya agent berikutnya tidak salah kira ini bug baru.
+- Belum ada final whole-branch code review (langkah terakhir sebelum PR menurut proses subagent-driven-development).
 
 ### Next Step
-- Menunggu approval user untuk push branch dan buat PR baru (PR terpisah dari #23-#26 yang sudah merged).
-- Sebelum atau setelah PR: user disarankan memutuskan apakah dedup nama file ZIP (poin Known Issues pertama) perlu di-fix sekarang atau jadi task terpisah nanti.
-- Setelah PR & merge: user disarankan mencoba unduh massal di acara sungguhan (idealnya acara besar untuk uji concurrency nyata) dan cek tampilan admin di HP asli untuk konfirmasi visual fix overlap.
+1. Dispatch final whole-branch code review (model paling capable) atas diff penuh `b46dd81..HEAD`.
+2. Kalau review bersih atau temuan sudah diperbaiki: minta approval user untuk push branch dan buat PR baru.
+3. Setelah PR & merge: user disarankan mengecek tampilan Hub di perangkat mobile sungguhan (bukan cuma viewport emulasi) untuk konfirmasi visual akhir.
