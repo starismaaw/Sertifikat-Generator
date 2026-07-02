@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { timingSafeEqual } from 'crypto';
 import { makeServiceClient } from './_supabase.js';
+import { slugify, isValidSlug } from '../src/lib/slug.js';
 
 function verifyPassword(provided: string): boolean {
   const expected = process.env.PAKTA_ADMIN_PASSWORD ?? '';
@@ -14,6 +15,8 @@ function verifyPassword(provided: string): boolean {
     return false;
   }
 }
+
+const MAX_SLUG_ATTEMPTS = 30;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -53,19 +56,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!nama || !tanggal) {
         return res.status(400).json({ error: 'nama dan tanggal wajib diisi' });
       }
-      const { data, error } = await sb
-        .from('pakta_events')
-        .insert({ nama, tanggal, template_path: template_path ?? null, bg_width, bg_height, fields })
-        .select();
-      if (error) return res.status(500).json({ error: error.message });
+      const base = slugify(nama) || 'acara';
+      let candidate = base;
+      let data: { id: string }[] | null = null;
+      let error: { code?: string; message: string } | null = null;
+      for (let attempt = 1; attempt <= MAX_SLUG_ATTEMPTS; attempt++) {
+        const result = await sb
+          .from('pakta_events')
+          .insert({ nama, tanggal, template_path: template_path ?? null, bg_width, bg_height, fields, slug: candidate })
+          .select();
+        data = result.data;
+        error = result.error;
+        if (!error) break;
+        if (error.code !== '23505') {
+          return res.status(500).json({ error: error.message });
+        }
+        candidate = `${base}-${attempt + 1}`;
+      }
+      if (error) return res.status(500).json({ error: 'Gagal membuat slug unik untuk kegiatan ini setelah beberapa percobaan' });
       return res.status(200).json({ event: data?.[0] ?? null });
     }
 
     case 'update_event': {
       const { id, action: _action, ...patch } = body as { id: string; action: string; [k: string]: unknown };
       if (!id) return res.status(400).json({ error: 'id acara wajib diisi' });
+      if (typeof patch.slug === 'string' && !isValidSlug(patch.slug)) {
+        return res.status(400).json({ error: 'Slug harus huruf kecil, angka, dan tanda hubung saja (3-60 karakter)' });
+      }
       const { error } = await sb.from('pakta_events').update(patch).eq('id', id);
-      if (error) return res.status(500).json({ error: error.message });
+      if (error) {
+        if (error.code === '23505') {
+          return res.status(409).json({ error: 'Slug ini sudah dipakai kegiatan lain' });
+        }
+        return res.status(500).json({ error: error.message });
+      }
       return res.status(200).json({ ok: true });
     }
 

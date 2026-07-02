@@ -105,6 +105,92 @@ describe('pakta-admin handler', () => {
     expect(res.body.event.id).toBe('ev-new');
   });
 
+  // WHY: slug harus otomatis dibuat dari nama acara supaya admin tidak perlu isi manual saat membuat kegiatan.
+  it('create_event membuat slug otomatis dari nama', async () => {
+    const newEvent = { id: 'ev-new', nama: 'Pakta Baru', slug: 'pakta-baru', status: 'aktif' };
+    const selectFn = vi.fn().mockResolvedValue({ data: [newEvent], error: null });
+    const insertMock = vi.fn().mockReturnValue({ select: selectFn });
+    fromAdminMock.mockReturnValue({ insert: insertMock });
+
+    const res = mockRes();
+    await handler(mockReq({
+      action: 'create_event',
+      nama: 'Pakta Baru',
+      tanggal: '2026-07-01',
+      bg_width: 800,
+      bg_height: 600,
+      fields: [],
+    }), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(insertMock).toHaveBeenCalledTimes(1);
+    expect(insertMock.mock.calls[0][0].slug).toBe('pakta-baru');
+  });
+
+  // WHY: dua acara dengan nama yang menghasilkan slug sama harus otomatis dapat akhiran -2, -3, dst — bukan gagal.
+  it('create_event menambah akhiran -2 kalau slug dasar sudah dipakai', async () => {
+    const selectFn = vi.fn()
+      .mockResolvedValueOnce({ data: null, error: { code: '23505', message: 'duplicate key' } })
+      .mockResolvedValueOnce({ data: [{ id: 'ev-new', slug: 'pakta-baru-2' }], error: null });
+    const insertMock = vi.fn().mockReturnValue({ select: selectFn });
+    fromAdminMock.mockReturnValue({ insert: insertMock });
+
+    const res = mockRes();
+    await handler(mockReq({
+      action: 'create_event',
+      nama: 'Pakta Baru',
+      tanggal: '2026-07-01',
+      bg_width: 800,
+      bg_height: 600,
+      fields: [],
+    }), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(insertMock).toHaveBeenCalledTimes(2);
+    expect(insertMock.mock.calls[0][0].slug).toBe('pakta-baru');
+    expect(insertMock.mock.calls[1][0].slug).toBe('pakta-baru-2');
+  });
+
+  // WHY: kegagalan lain (bukan tabrakan slug) harus langsung dilaporkan, bukan diulang sia-sia.
+  it('create_event langsung gagal kalau error bukan tabrakan slug', async () => {
+    const selectFn = vi.fn().mockResolvedValue({ data: null, error: { code: '23502', message: 'not null violation' } });
+    const insertMock = vi.fn().mockReturnValue({ select: selectFn });
+    fromAdminMock.mockReturnValue({ insert: insertMock });
+
+    const res = mockRes();
+    await handler(mockReq({
+      action: 'create_event',
+      nama: 'Pakta Baru',
+      tanggal: '2026-07-01',
+      bg_width: 800,
+      bg_height: 600,
+      fields: [],
+    }), res);
+
+    expect(res.statusCode).toBe(500);
+    expect(insertMock).toHaveBeenCalledTimes(1);
+  });
+
+  // WHY: update_event harus menerjemahkan error tabrakan slug Postgres jadi pesan yang dimengerti admin.
+  it('update_event mengembalikan pesan jelas kalau slug sudah dipakai', async () => {
+    const eqMock = vi.fn().mockResolvedValue({ error: { code: '23505', message: 'duplicate key value violates unique constraint' } });
+    fromAdminMock.mockReturnValue({ update: vi.fn().mockReturnValue({ eq: eqMock }) });
+
+    const res = mockRes();
+    await handler(mockReq({ action: 'update_event', id: 'ev1', slug: 'sudah-dipakai' }), res);
+
+    expect(res.statusCode).toBe(409);
+    expect(res.body.error).toBe('Slug ini sudah dipakai kegiatan lain');
+  });
+
+  // WHY: format slug tidak valid harus ditolak sebelum menyentuh database.
+  it('update_event menolak slug dengan format tidak valid', async () => {
+    fromAdminMock.mockReturnValue({});
+    const res = mockRes();
+    await handler(mockReq({ action: 'update_event', id: 'ev1', slug: 'Slug Tidak Valid!' }), res);
+    expect(res.statusCode).toBe(400);
+  });
+
   // WHY: import_signers harus memproses array pegawai dan menyimpan semuanya.
   it('import_signers menyimpan daftar pegawai', async () => {
     fromAdminMock.mockReturnValue({
