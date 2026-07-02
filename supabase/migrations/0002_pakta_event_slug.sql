@@ -8,25 +8,37 @@ alter table pakta_events add column if not exists slug text;
 
 -- 2. Backfill: buat slug dari nama untuk semua baris yang sudah ada,
 --    tambahkan akhiran -2, -3, dst kalau ada nama yang menghasilkan
---    slug dasar yang sama.
+--    slug dasar yang sama. Nama yang terlalu pendek (<3 karakter bersih)
+--    jatuh ke 'acara'; nama yang terlalu panjang dipotong ke 55 karakter
+--    (menyisakan ruang untuk akhiran -N) supaya tetap lolos constraint
+--    format (3-60 karakter) yang ditambahkan di langkah 3.
 with base as (
   select
     id,
-    trim(both '-' from regexp_replace(lower(nama), '[^a-z0-9]+', '-', 'g')) as base_slug,
+    trim(both '-' from regexp_replace(lower(nama), '[^a-z0-9]+', '-', 'g')) as cleaned,
     created_at
   from pakta_events
   where slug is null
+),
+safe_base as (
+  select
+    id,
+    created_at,
+    case
+      when length(cleaned) >= 3 then trim(trailing '-' from left(cleaned, 55))
+      else 'acara'
+    end as base_slug
+  from base
 ),
 numbered as (
   select
     id,
     case
       when row_number() over (partition by base_slug order by created_at) = 1
-        then coalesce(nullif(base_slug, ''), 'acara')
-      else coalesce(nullif(base_slug, ''), 'acara') || '-' ||
-           row_number() over (partition by base_slug order by created_at)::text
+        then base_slug
+      else base_slug || '-' || (row_number() over (partition by base_slug order by created_at))::text
     end as new_slug
-  from base
+  from safe_base
 )
 update pakta_events e
 set slug = n.new_slug
