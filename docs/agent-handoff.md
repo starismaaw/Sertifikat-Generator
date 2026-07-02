@@ -1,99 +1,53 @@
 ## Agent Handoff
 
-**Branch:** `claude/gallant-lovelace-b6d0ac`
-**Task:** Slug custom untuk link tanda tangan Pakta Integritas — user melapor link tanda tangan per-kegiatan tidak human-readable (UUID mentah), minta bisa di-custom admin.
+**Branch:** `claude/frosty-gauss-fb09bb`
+**Task:** Preview tanda tangan realistis untuk Pakta Integritas — dokumen penuh (background + field nama/NIP/jabatan terisi data asli) ditampilkan saat pegawai menandatangani, dengan kanvas TTD transparan tepat di posisi field `tandaTangan`, supaya terasa seperti menandatangani dokumen asli (bukan kartu ringkasan teks + kotak TTD terpisah seperti sebelumnya).
 **Last agent:** Claude Sonnet 5 (Claude Code), via context7 research → brainstorming → writing-plans → subagent-driven-development
-**Status:** SELESAI. Task 1-8 dari plan selesai + semua review task bersih. Final whole-branch review: **Ready to merge: Yes** (round 1 menemukan 1 bug Important lintas-task — lihat di bawah — diperbaiki, round 2 approved). Build ✅, test 113/113 ✅ (dikonfirmasi ulang independen oleh controller setelah fix terakhir), manual browser verification admin-side ✅ (mocked fetch). Menunggu approval user untuk push/PR/merge. **Migration SQL belum dijalankan di Supabase produksi** — itu tindakan manual user, WAJIB sebelum fitur ini berfungsi.
+**Status:** SELESAI. Semua 7 task dari plan selesai, semua task review bersih (task 4 butuh 2 ronde fix — lihat di bawah). Manual browser verification oleh controller sendiri (lewat harness sementara + `preview_*` tools, tidak dikomit) menemukan dan memperbaiki 1 bug tambahan (lihat "Bug ditemukan lewat verifikasi manual"). Build ✅, test 136/136 ✅. **Belum di-push/PR/merge** — menunggu instruksi eksplisit user.
 
 ### Referensi
-- Spec: `docs/superpowers/specs/2026-07-02-pakta-link-slug-design.md`
-- Plan: `docs/superpowers/plans/2026-07-02-pakta-link-slug.md`
-- Ledger progres SDD: `.superpowers/sdd/progress.md` (bagian "Pakta Link Slug")
-
-### Latar Belakang
-User: "pada Link Tanda Tangan unik untuk user/pegawai saat ini link nya tidak human-readable, terlalu unik. Apakah bisa di buat custom oleh admin?"
-
-Riset kode (sebelum brainstorming) menemukan link Pakta Integritas sebenarnya **per-kegiatan (event)**, bukan per-pegawai — semua pegawai memakai URL yang sama (`#pakta/{eventId}`, UUID mentah dari `gen_random_uuid()`), lalu memilih nama dari dropdown. Klarifikasi dengan user mengonfirmasi scope: tetap SATU link per kegiatan (bukan link individual per pegawai), tapi bagian identifier di URL bisa diganti admin jadi teks yang mudah dibaca.
-
-Keputusan desain kunci (dari brainstorming): slug otomatis dibuat dari nama kegiatan saat dibuat, admin bisa edit kapan saja inline di dashboard; kegiatan lama otomatis dapat slug lewat migration (link UUID lama berhenti berfungsi setelahnya); mengubah slug langsung mematikan slug lama (tanpa redirect).
+- Spec: `docs/superpowers/specs/2026-07-02-pakta-realistic-signing-preview-design.md`
+- Plan: `docs/superpowers/plans/2026-07-02-pakta-realistic-signing-preview.md`
+- Ledger progres SDD: `.superpowers/sdd/progress.md`
 
 ### Ringkasan Perubahan
-- `supabase/migrations/0002_pakta_event_slug.sql` (baru) — tambah kolom `slug` (unique, format-terbatas), backfill kegiatan lama dari nama (dengan disambiguasi `-2`/`-3` untuk nama kembar, fallback untuk nama terlalu pendek/panjang). **Belum dijalankan di produksi.**
-- `src/lib/slug.ts` (baru) — `slugify()` (server-side auto-generate) dan `isValidSlug()` (validasi format, dipakai server+client).
-- `api/pakta-admin.ts` — `create_event` auto-generate slug dari nama dengan retry-on-collision (`-2`, `-3`, dst, maks 30 percobaan); `update_event` validasi format + terjemahkan konflik unique-constraint Postgres jadi pesan "Slug ini sudah dipakai kegiatan lain".
-- `src/lib/paktaStore.ts` — `getAcaraPakta(id)` → `getAcaraByLink(slug)`, query `.eq('slug', ...)` bukan `.eq('id', ...)`.
-- `src/components/pakta-signer/PaktaSignPage.tsx` — prop `eventId` → `slug`; resolve slug ke event asli (dapat UUID asli) dulu, baru query daftar signer & kirim `get_pdf_upload_url` pakai UUID asli (bukan slug).
-- `src/components/pakta-admin/PaktaDashboard.tsx` — link/QR dibangun dari `event.slug`; UI edit inline di kartu "Link Tanda Tangan" (tombol Ubah → input+validasi realtime → Simpan/Batal).
-- `src/App.tsx` / `src/components/AppRouter.tsx` — wiring prop `slug` + komentar penjelas (routing struktural tidak berubah).
+- `tests/setup.ts` — polyfill `ResizeObserver` untuk jsdom (dibutuhkan `SignaturePad` & `PaktaDocumentPreview`).
+- `src/lib/pdfRenderer.ts` — `browserTextWidth` diekspor (sebelumnya private) supaya bisa dipakai ulang oleh preview browser, identik dengan pengukuran teks di PDF akhir.
+- `src/lib/paktaPreviewLayout.ts` (baru) — fungsi murni: `computeScale`, `computeSignatureBox` (dengan `MIN_SIGNATURE_HEIGHT = 140` — klem ukuran minimum kotak TTD di layar sempit, keputusan UX dari diskusi user soal ergonomi mobile), `fitFontSizeCss`.
+- `src/components/pakta-signer/SignaturePad.tsx` — mode "embedded": prop `transparent`, `hideClearButton`, `onStrokeBegin` (fire di SETIAP stroke baru, bukan cuma pertama kali — lihat catatan bug di bawah), `style`. Default tetap perilaku lama (dipakai standalone di path fallback).
+- `src/components/pakta-signer/PaktaDocumentPreview.tsx` (baru) — komponen inti: render `<img>` background + field terisi (posisi presisi via scale) + kotak TTD interaktif (SignaturePad transparan + hint dashed "Tanda tangan di sini" + tombol Hapus di pojok kotak). `formatter` field (uppercase) sengaja tidak diterapkan — parity dengan `pdfRenderer.ts` yang juga mengabaikannya untuk Pakta.
+- `src/components/pakta-signer/PaktaSignPage.tsx` — step `signing` diganti total: kartu ringkasan teks + kotak TTD terpisah → `PaktaDocumentPreview`. Fallback ke `SignaturePad` standalone bila template belum punya field `tandaTangan`. `handleSubmit` tidak diubah.
 
-### Files Changed
-- `supabase/migrations/0002_pakta_event_slug.sql` (baru, tidak dijalankan)
-- `src/lib/slug.ts` (baru)
-- `api/pakta-admin.ts`
-- `src/lib/paktaStore.ts`
-- `src/components/pakta-signer/PaktaSignPage.tsx`
-- `src/components/pakta-admin/PaktaDashboard.tsx`
-- `src/App.tsx`
-- `src/components/AppRouter.tsx`
-- `tests/slug.test.ts` (baru)
-- `tests/paktaAdmin.test.ts`
-- `tests/paktaStore.test.ts`
+### Bug ditemukan & diperbaiki selama proses
+1. **Task 4, ronde review 1→3:** `pad.addEventListener('beginStroke', ..., { once: true })` di draft awal berarti hint TTD cuma bisa hilang SEKALI seumur hidup komponen — setelah "Hapus Tanda Tangan" lalu menggambar ulang, hint tidak akan hilang lagi. Ditemukan reviewer, diperbaiki (hapus `{ once: true }`). Fix pertama lolos tapi test pembuktinya ternyata tidak benar-benar menguji perilaku (mock `signature_pad` mengabaikan opsi `once`) — reviewer menangkap ini juga, jadi ada ronde fix ke-2 yang membuat mock benar-benar menghormati semantik `once` (dibuktikan dengan sanity-check manual: reintroduce bug → test gagal, revert fix → test lolos).
+2. **Task 7, manual browser verification:** teks field panjang (mis. jabatan) pecah ke baris kedua di layar sempit alih-alih tetap satu baris dan mengecil — `fitFontSizeCss` menghitung ukuran font yang pas, tapi tanpa `white-space: nowrap` browser tetap bisa wrap karena selisih sub-pixel antara pengukuran canvas vs layout DOM. PDF akhir selalu satu baris, jadi ini pecah paritas visual. Diperbaiki: `white-space: nowrap` pada teks + `overflow: hidden` pada wrapper sebagai pengaman (commit `fc1ebbc`).
+
+### Verifikasi manual yang sudah dilakukan
+Karena tidak ada `.env` Supabase di worktree ini (hanya `.env.example`), verifikasi end-to-end dengan data Supabase asli TIDAK BISA dilakukan di sini. Sebagai gantinya, dilakukan verifikasi visual lewat harness sementara (`src/main.tsx` di-override sementara untuk me-render `PaktaDocumentPreview` langsung dengan data fixture, lalu dikembalikan via `git checkout` — tidak ada jejak di working tree) memakai `preview_*` tools:
+- ✅ Dokumen penuh dengan field jabatan/namaNip terisi tampil presisi.
+- ✅ Kotak TTD dengan hint dashed "Tanda tangan di sini" sebelum digambar.
+- ✅ Klem `MIN_SIGNATURE_HEIGHT` terbukti bekerja di browser sungguhan: viewport mobile 375px, field TTD kecil yang secara matematis akan jadi ±54px tinggi, tetap dijaga 140px persis (dikonfirmasi lewat `getBoundingClientRect()`).
+- ✅ Menggambar (via `PointerEvent` sintetis) → hint hilang, tombol "Hapus Tanda Tangan" muncul di pojok kotak.
+- ✅ Klik "Hapus Tanda Tangan" → kanvas kosong, hint muncul lagi.
+- ✅ Menggambar lagi setelah hapus → hint hilang lagi (membuktikan fix bug #1 bekerja end-to-end, bukan cuma di unit test).
+
+**Belum diverifikasi:** alur signing end-to-end dengan Supabase asli (pilih nama dari daftar, submit, upload PDF, download) — perlu `.env` terisi kredensial Supabase yang valid dan event/signer nyata di database. Juga belum diverifikasi visual di desktop width penuh dengan template asli (hanya diuji dengan template fixture buatan sendiri).
 
 ### Commands Run
-- `npm run test` — ✅ 112/112 pass (19 file test, termasuk `tests/slug.test.ts` baru). Stderr noise dari `HTMLCanvasElement.getContext` pre-existing (jsdom), tidak terkait sesi ini.
-- `npm run build` — ✅ 0 error. Warning chunk >500kB pre-existing.
-- `npm run lint` — N/A, tidak ada script lint di proyek ini.
-- `npx tsc -b` — ✅ 0 error di seluruh project (bukan `tsc -b --noEmit`, yang gagal karena ketidakcocokan flag pre-existing dengan tsconfig composite — sudah didokumentasikan di sesi Landing Hub sebelumnya).
-- Manual browser verification (preview tool, mocked `window.fetch` untuk `/api/pakta-admin` — tidak ada kredensial Supabase di sandbox ini):
-  - Login admin (mocked) → dashboard kegiatan mocked → kartu "Link Tanda Tangan" menampilkan `#pakta/pelatihan-juli-2026` (slug, bukan UUID) ✅
-  - Klik "Ubah" → input inline muncul terisi slug saat ini, tombol Simpan/Batal ✅
-  - Ketik slug format salah ("Ada Spasi Besar!") → Simpan → error inline "Slug harus huruf kecil, angka, dan tanda hubung saja (3-60 karakter)", TIDAK ada network call (validasi client-side blokir sebelum submit) ✅
-  - Ketik slug valid baru ("pelatihan-agustus-2026") → Simpan → link & QR code di kartu berubah, keluar dari mode edit ✅
-  - Ketik slug yang di-mock sebagai "sudah dipakai" → Simpan → error inline "Slug ini sudah dipakai kegiatan lain" (409 dari mock), input TIDAK hilang, tombol Simpan/Batal TIDAK stuck-disabled, link lama TIDAK berubah ✅
-  - Tidak ada console error di sepanjang alur ini.
-  - **Halaman publik** (`PaktaSignPage`, alur pegawai buka link) TIDAK bisa diverifikasi live browser end-to-end di sandbox ini — tidak ada file `.env` (tidak ada `VITE_SUPABASE_URL`), jadi panggilan Supabase asli hang tanpa respons (bukan bug dari perubahan ini — perilaku sama akan terjadi dengan lookup UUID lama juga). Logika resolve-slug-lalu-query-signer sudah diverifikasi lewat unit test (`tests/paktaStore.test.ts`, memastikan query pakai kolom `slug`) dan code review manual (Task 5, trace lengkap alur `getAcaraByLink` → `listSigners(template.eventId)` → `get_pdf_upload_url` pakai UUID asli).
-
-### Validation
-- Build: ✅ PASS
-- Lint: N/A (tidak ada script lint di proyek ini)
-- Test: ✅ 112/112 PASS
-
-### Proses Eksekusi
-Subagent-Driven Development, 7 task implementasi + 1 task verifikasi:
-- Task 1 (migration SQL) — implementer haiku, reviewer sonnet. **Round 1: Needs fixes** — reviewer menemukan bug Important: nama kegiatan pendek (mis. "AB") menghasilkan slug 2 karakter yang melanggar CHECK constraint `length(slug) between 3 and 60` yang ditambahkan migration yang sama, membuat migration gagal di produksi. Controller juga menemukan risiko serupa untuk nama sangat panjang (tidak ada batas atas). Fix subagent memperbaiki backfill CTE (fallback 'acara' untuk nama <3 karakter, potong ke 55 karakter untuk nama panjang). **Round 2: Approved**, kedua bug diverifikasi benar-benar teratasi lewat trace manual independen.
-- Task 2 (slug.ts utility) — implementer haiku, reviewer sonnet, Approved (3 catatan Minor soal cakupan test).
-- Task 3 (api/pakta-admin.ts) — implementer haiku, reviewer sonnet, Approved (2 catatan Minor).
-- Task 4 (paktaStore.ts) — implementer haiku, reviewer sonnet, Approved (1 catatan Minor).
-- Task 5 (PaktaSignPage.tsx) — implementer haiku, reviewer sonnet, Approved (0 catatan).
-- Task 6 (PaktaDashboard.tsx, task terbesar) — implementer haiku, reviewer sonnet, Approved (2 catatan Minor).
-- Task 7 (wiring App.tsx/AppRouter.tsx) — implementer haiku, reviewer sonnet, Approved (0 catatan), diverifikasi independen `tsc -b` bersih.
-- Task 8 (full suite/build/manual verification) — dikerjakan langsung controller.
-- **Final whole-branch review** (model Opus, dispatch terpisah dari 8 task di atas) — **Round 1: Needs fixes**. Menemukan 1 bug Important **lintas-task** yang tidak terlihat oleh review per-task manapun: migration (Task 1) sudah menangani nama pendek/panjang dengan aman, tapi jalur runtime `create_event` (Task 3) TIDAK meniru pengamanan yang sama — nama seperti "K3" atau "PI" (singkatan umum instansi pemerintah, "PI" bahkan singkatan dari "Pakta Integritas" itu sendiri) akan menghasilkan slug 2 karakter yang melanggar CHECK constraint, membuat pembuatan acara gagal dengan error 500 yang membingungkan. Fix subagent menyamakan logika clamp `create_event` persis dengan migration (fallback 'acara' untuk <3 karakter, potong ke 55 karakter) + tambah test regresi. **Round 2: Ready to merge: Yes**, fix diverifikasi benar lewat trace independen (`"K3"` → fallback 'acara'; `"Pakta Baru"` → tidak berubah, tidak ada regresi), tidak ada temuan baru.
-
-Tidak ada Critical/Important yang belum diperbaiki — baik di 7 task review maupun final whole-branch review (setelah fix round 2). Test suite dikonfirmasi ulang independen oleh controller: 113/113 pass.
-
-Ledger progres lengkap: `.superpowers/sdd/progress.md` (bagian "Pakta Link Slug — SDD Progress Ledger").
-
-Commit (urutan kronologis, base `af1f96b`):
-1. `58cbaa7` — feat(pakta): add slug column migration for custom signing links (not executed)
-2. `8cc9e2e` — fix(pakta): handle short and overlong names in slug backfill migration
-3. `b8c39a6` — feat(pakta): add slugify/isValidSlug utility for custom signing links
-4. `b28b83d` — feat(pakta): auto-generate unique slug on create, validate + map conflicts on update
-5. `c694a9e` — feat(pakta): look up public event by slug instead of UUID
-6. `55ea30b` — feat(pakta): resolve public signer page by slug, use real UUID downstream
-7. `af84271` — feat(pakta): show slug-based public link, add inline slug editing
-8. `1665db8` — feat(pakta): wire slug prop from router into PaktaSignPage
-9. `652f9a6` — fix(pakta): clamp auto-generated slug length in create_event to satisfy DB constraint (dari final whole-branch review round 1)
-
-(Base untuk fitur ini: `af1f96b`, commit terakhir sebelum implementasi dimulai — juga commit "docs: tambah spec, plan, dan handoff untuk Landing Hub" dari sesi sebelumnya.)
+```
+npm install
+npm run build   # tsc -b && vite build — PASS
+npx vitest run  # 22 files, 136/136 tests — PASS
+```
+**Catatan jujur:** tidak ada script `lint` di `package.json` (project-wide, bukan spesifik perubahan ini) — `npm run lint` yang disebut di finish protocol AGENTS.md tidak bisa dijalankan karena scriptnya tidak ada. Ini bukan sesuatu yang saya perbaiki (di luar scope fitur ini) — perlu keputusan user apakah mau ditambahkan.
 
 ### Known Issues
-- **Migration SQL belum dijalankan di Supabase produksi** — `supabase/migrations/0002_pakta_event_slug.sql` sudah ditulis dan direview (termasuk 1 putaran fix), tapi TIDAK dieksekusi oleh agent (sesuai aturan proyek soal database produksi). User perlu menjalankannya manual di Supabase SQL Editor SEBELUM fitur ini berfungsi — sebelum migration dijalankan, kolom `slug` tidak ada di database, jadi kode baru yang query `.eq('slug', ...)` akan gagal.
-- Halaman publik (`PaktaSignPage`) tidak bisa diverifikasi end-to-end lewat browser sungguhan di sandbox ini (tidak ada `.env`/kredensial Supabase) — lihat detail di Commands Run.
-- `PaktaSignPage.tsx` dan `PaktaDashboard.tsx` tidak punya test otomatis (keputusan eksplisit di plan — kedua file menarik context Supabase-backed yang membuat unit test tidak proporsional) — diverifikasi lewat `tsc` + manual browser (dashboard) dan code review (signer page).
-- Minor (dari final review, tidak di-fix, tidak mendesak): batas 3 karakter dan pemotongan 55 karakter terduplikasi di tiga tempat (`api/pakta-admin.ts`, `src/lib/slug.ts`, migration SQL) — konstanta bersama bisa mengurangi risiko drift di masa depan, tapi bukan bug.
+- Verifikasi Supabase end-to-end belum bisa dilakukan di worktree ini (lihat di atas) — sangat disarankan dites manual sekali lagi di environment dengan `.env` terisi sebelum merge ke `main`.
+- Tidak ada script `lint` di project (pre-existing, di luar scope).
+- Bundle JS utama >2MB setelah build (warning dari Vite, pre-existing, tidak terkait perubahan ini).
 
 ### Next Step
-1. Minta approval user untuk push branch dan buat PR baru (semua review sudah bersih, siap merge).
-2. **Sebelum atau segera setelah merge:** user WAJIB menjalankan `supabase/migrations/0002_pakta_event_slug.sql` manual di Supabase SQL Editor produksi — fitur ini tidak akan berfungsi tanpa migration ini (kolom `slug` belum ada).
-3. Setelah migration jalan: user disarankan mencoba alur lengkap di kegiatan sungguhan (buat kegiatan baru → cek slug otomatis → ubah slug → buka link baru sebagai pegawai → tanda tangan) untuk konfirmasi end-to-end yang tidak bisa diuji di sandbox ini.
+1. User me-review perubahan (atau minta code review lewat `/code-review`).
+2. Task-per-task sudah dikomit oleh subagent selama eksekusi plan (lihat `git log` untuk daftar commit dari `6ae1ba9` sampai `fc1ebbc`), jadi working tree sudah bersih; tidak ada langkah commit tambahan yang tertunda untuk kode.
+3. Push branch & buat PR hanya setelah user eksplisit minta.
+4. Sebelum atau sesudah merge: uji manual sekali dengan Supabase environment nyata (pilih nama, tanda tangan, submit, download PDF) untuk menutup gap verifikasi di atas.
