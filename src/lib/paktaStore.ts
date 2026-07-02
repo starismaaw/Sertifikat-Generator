@@ -14,18 +14,19 @@ export interface SignerRow {
 }
 
 /**
- * Ambil data acara pakta untuk halaman tanda tangan publik.
- * Mengembalikan null bila acara tidak ditemukan atau sudah ditutup.
+ * Ambil data acara pakta untuk halaman tanda tangan publik lewat slug link
+ * custom (bukan UUID). Mengembalikan null bila slug tidak ditemukan atau
+ * acara sudah ditutup.
  * Catatan: background belum diisi di sini (diunduh terpisah di Plan 4).
  */
-export async function getAcaraPakta(id: string): Promise<
+export async function getAcaraByLink(slug: string): Promise<
   (PaktaTemplate & { eventId: string; nama: string; tanggal: string; templatePath: string }) | null
 > {
   const sb = getSupabaseClient();
   const { data, error } = await sb
     .from('pakta_events')
     .select('id, nama, tanggal, template_path, bg_width, bg_height, fields, status')
-    .eq('id', id)
+    .eq('slug', slug)
     .single();
 
   if (error || !data) return null;

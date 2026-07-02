@@ -1,79 +1,99 @@
 ## Agent Handoff
 
 **Branch:** `claude/gallant-lovelace-b6d0ac`
-**Task:** Redesain halaman awal jadi Landing Hub netral (2 kartu setara: Sertifikat Generator & Pakta Integritas) — user melapor halaman awal membingungkan, tidak jelas mana menu ke Sertifikat Generator dan mana ke Pakta Integritas.
-**Last agent:** Claude Sonnet 5 (Claude Code), via brainstorming → writing-plans → subagent-driven-development
-**Status:** Task 1-6 dari plan selesai + semua review task bersih (0 Critical/Important di semua 5 task). Build ✅, test 97/97 ✅, manual browser verification ✅ (desktop + mobile). Final whole-branch review BELUM dijalankan. Menunggu approval user untuk push/PR/merge.
+**Task:** Slug custom untuk link tanda tangan Pakta Integritas — user melapor link tanda tangan per-kegiatan tidak human-readable (UUID mentah), minta bisa di-custom admin.
+**Last agent:** Claude Sonnet 5 (Claude Code), via context7 research → brainstorming → writing-plans → subagent-driven-development
+**Status:** SELESAI. Task 1-8 dari plan selesai + semua review task bersih. Final whole-branch review: **Ready to merge: Yes** (round 1 menemukan 1 bug Important lintas-task — lihat di bawah — diperbaiki, round 2 approved). Build ✅, test 113/113 ✅ (dikonfirmasi ulang independen oleh controller setelah fix terakhir), manual browser verification admin-side ✅ (mocked fetch). Menunggu approval user untuk push/PR/merge. **Migration SQL belum dijalankan di Supabase produksi** — itu tindakan manual user, WAJIB sebelum fitur ini berfungsi.
 
 ### Referensi
-- Spec: `docs/superpowers/specs/2026-07-02-landing-hub-design.md`
-- Plan: `docs/superpowers/plans/2026-07-02-landing-hub.md`
-- Ledger progres SDD: `.superpowers/sdd/progress.md`
+- Spec: `docs/superpowers/specs/2026-07-02-pakta-link-slug-design.md`
+- Plan: `docs/superpowers/plans/2026-07-02-pakta-link-slug.md`
+- Ledger progres SDD: `.superpowers/sdd/progress.md` (bagian "Pakta Link Slug")
 
 ### Latar Belakang
-User: "Halaman awal aplikasi terlihat membingungkan, belum terlihat jelas mana menu untuk menuju ke sertifikat generator dan mana menu untuk ke pakta integritas." Audit menemukan halaman `home` sebelumnya langsung merender daftar kegiatan sertifikat (`EventList`), dengan tombol "Pakta Integritas" ditaruh sebagai pill kecil sejajar tombol aksi biasa — tidak ada isyarat visual bahwa itu pintu masuk ke modul terpisah (dengan sistem login admin sendiri).
+User: "pada Link Tanda Tangan unik untuk user/pegawai saat ini link nya tidak human-readable, terlalu unik. Apakah bisa di buat custom oleh admin?"
 
-Brainstorming dengan user menghasilkan 3 opsi (hub netral / hub+shortcut terakhir dibuka / sidebar app-switcher permanen). User memilih **hub netral** — dua kartu besar setara, isi kartu **ikon + nama saja** (tanpa deskripsi/statistik, preferensi eksplisit user untuk minimalis).
+Riset kode (sebelum brainstorming) menemukan link Pakta Integritas sebenarnya **per-kegiatan (event)**, bukan per-pegawai — semua pegawai memakai URL yang sama (`#pakta/{eventId}`, UUID mentah dari `gen_random_uuid()`), lalu memilih nama dari dropdown. Klarifikasi dengan user mengonfirmasi scope: tetap SATU link per kegiatan (bukan link individual per pegawai), tapi bagian identifier di URL bisa diganti admin jadi teks yang mudah dibaca.
+
+Keputusan desain kunci (dari brainstorming): slug otomatis dibuat dari nama kegiatan saat dibuat, admin bisa edit kapan saja inline di dashboard; kegiatan lama otomatis dapat slug lewat migration (link UUID lama berhenti berfungsi setelahnya); mengubah slug langsung mematikan slug lama (tanpa redirect).
 
 ### Ringkasan Perubahan
-- `src/components/AppRouter.tsx` — tambah view `{ name: 'sertifikat' }` (hash `#sertifikat`); `parseHash` diekspor (sebelumnya privat) supaya unit-testable.
-- `src/components/Hub.tsx` (baru) — 2 kartu `<button>` asli (bukan `div onClick`, untuk aksesibilitas keyboard/screen-reader native): "Sertifikat Generator" → `navigate({name:'sertifikat'})`, "Pakta Integritas" → `navigate({name:'pakta-admin'})`. Styling reuse token `sg-*`/`apple-design.css` yang sudah ada (tidak ada bahasa desain baru).
-- `src/components/AppTopbar.tsx` — logo "S" diubah dari `<div>` statis jadi `<button aria-label="Beranda">` yang navigasi ke Hub (pola standar "klik logo = pulang ke beranda").
-- `src/App.tsx` — `view.name==='home'` sekarang render `<Hub/>` (bukan lagi `EventList`), `view.name==='sertifikat'` render `<EventList/>`. Breadcrumb diperluas: alur sertifikat sekarang `Beranda → Sertifikat Generator → [nama kegiatan] → ...` (sebelumnya langsung `Beranda → [nama kegiatan]`); alur Pakta Integritas TIDAK berubah.
-- `src/components/EventList.tsx` — tombol "Pakta Integritas" dihapus (sudah redundan, jalur ke modul itu sekarang lewat Hub/breadcrumb).
+- `supabase/migrations/0002_pakta_event_slug.sql` (baru) — tambah kolom `slug` (unique, format-terbatas), backfill kegiatan lama dari nama (dengan disambiguasi `-2`/`-3` untuk nama kembar, fallback untuk nama terlalu pendek/panjang). **Belum dijalankan di produksi.**
+- `src/lib/slug.ts` (baru) — `slugify()` (server-side auto-generate) dan `isValidSlug()` (validasi format, dipakai server+client).
+- `api/pakta-admin.ts` — `create_event` auto-generate slug dari nama dengan retry-on-collision (`-2`, `-3`, dst, maks 30 percobaan); `update_event` validasi format + terjemahkan konflik unique-constraint Postgres jadi pesan "Slug ini sudah dipakai kegiatan lain".
+- `src/lib/paktaStore.ts` — `getAcaraPakta(id)` → `getAcaraByLink(slug)`, query `.eq('slug', ...)` bukan `.eq('id', ...)`.
+- `src/components/pakta-signer/PaktaSignPage.tsx` — prop `eventId` → `slug`; resolve slug ke event asli (dapat UUID asli) dulu, baru query daftar signer & kirim `get_pdf_upload_url` pakai UUID asli (bukan slug).
+- `src/components/pakta-admin/PaktaDashboard.tsx` — link/QR dibangun dari `event.slug`; UI edit inline di kartu "Link Tanda Tangan" (tombol Ubah → input+validasi realtime → Simpan/Batal).
+- `src/App.tsx` / `src/components/AppRouter.tsx` — wiring prop `slug` + komentar penjelas (routing struktural tidak berubah).
 
 ### Files Changed
-- `src/components/AppRouter.tsx`
-- `src/components/Hub.tsx` (baru)
-- `src/components/AppTopbar.tsx`
+- `supabase/migrations/0002_pakta_event_slug.sql` (baru, tidak dijalankan)
+- `src/lib/slug.ts` (baru)
+- `api/pakta-admin.ts`
+- `src/lib/paktaStore.ts`
+- `src/components/pakta-signer/PaktaSignPage.tsx`
+- `src/components/pakta-admin/PaktaDashboard.tsx`
 - `src/App.tsx`
-- `src/components/EventList.tsx`
-- `src/styles/apple-design.css`
-- `tests/appRouter.test.ts` (baru)
-- `tests/Hub.test.tsx` (baru — component test pertama di repo ini yang pakai `@testing-library/react`)
-- `tests/AppTopbar.test.tsx` (baru)
+- `src/components/AppRouter.tsx`
+- `tests/slug.test.ts` (baru)
+- `tests/paktaAdmin.test.ts`
+- `tests/paktaStore.test.ts`
 
 ### Commands Run
-- `npm run test` — ✅ 97/97 pass (18 file test, termasuk 3 file baru). Ada stderr noise dari `HTMLCanvasElement.getContext` di `tests/pdfRenderer.test.ts` — pre-existing (jsdom tidak implementasi canvas), TIDAK terkait perubahan sesi ini, test tetap PASS.
-- `npm run build` — ✅ 0 error. Ada warning ukuran chunk >500kB — pre-existing, bundle sudah besar sebelum perubahan ini.
-- `npm run lint` — **tidak ada script lint di package.json ini** (bukan gap dari sesi ini, sudah begitu sejak awal).
-- `npx tsc -b --noEmit` — gagal dengan `TS6310` (composite project + `--noEmit` tidak kompatibel dengan referenced project `tsconfig.node.json`) — **ini bukan bug dari perubahan sesi ini**, murni ketidakcocokan command dengan struktur tsconfig repo ini. Verifikasi type-check sesungguhnya pakai `npx tsc -b` (persis command yang dipakai `npm run build`) — ✅ 0 error.
-- Manual browser verification (preview tool, bukan Bash): Hub tampil 2 kartu di desktop & mobile (375×812, stack vertikal tanpa overlap) → klik kartu Sertifikat Generator masuk ke daftar kegiatan dengan breadcrumb `Beranda → Sertifikat Generator` → klik "Beranda" di breadcrumb kembali ke Hub → klik kartu Pakta Integritas masuk ke halaman login admin dengan breadcrumb `Beranda → Pakta Integritas`, tidak overlap di mobile → kartu Hub bisa di-fokus via keyboard (native `<button>`) → tidak ada console error.
+- `npm run test` — ✅ 112/112 pass (19 file test, termasuk `tests/slug.test.ts` baru). Stderr noise dari `HTMLCanvasElement.getContext` pre-existing (jsdom), tidak terkait sesi ini.
+- `npm run build` — ✅ 0 error. Warning chunk >500kB pre-existing.
+- `npm run lint` — N/A, tidak ada script lint di proyek ini.
+- `npx tsc -b` — ✅ 0 error di seluruh project (bukan `tsc -b --noEmit`, yang gagal karena ketidakcocokan flag pre-existing dengan tsconfig composite — sudah didokumentasikan di sesi Landing Hub sebelumnya).
+- Manual browser verification (preview tool, mocked `window.fetch` untuk `/api/pakta-admin` — tidak ada kredensial Supabase di sandbox ini):
+  - Login admin (mocked) → dashboard kegiatan mocked → kartu "Link Tanda Tangan" menampilkan `#pakta/pelatihan-juli-2026` (slug, bukan UUID) ✅
+  - Klik "Ubah" → input inline muncul terisi slug saat ini, tombol Simpan/Batal ✅
+  - Ketik slug format salah ("Ada Spasi Besar!") → Simpan → error inline "Slug harus huruf kecil, angka, dan tanda hubung saja (3-60 karakter)", TIDAK ada network call (validasi client-side blokir sebelum submit) ✅
+  - Ketik slug valid baru ("pelatihan-agustus-2026") → Simpan → link & QR code di kartu berubah, keluar dari mode edit ✅
+  - Ketik slug yang di-mock sebagai "sudah dipakai" → Simpan → error inline "Slug ini sudah dipakai kegiatan lain" (409 dari mock), input TIDAK hilang, tombol Simpan/Batal TIDAK stuck-disabled, link lama TIDAK berubah ✅
+  - Tidak ada console error di sepanjang alur ini.
+  - **Halaman publik** (`PaktaSignPage`, alur pegawai buka link) TIDAK bisa diverifikasi live browser end-to-end di sandbox ini — tidak ada file `.env` (tidak ada `VITE_SUPABASE_URL`), jadi panggilan Supabase asli hang tanpa respons (bukan bug dari perubahan ini — perilaku sama akan terjadi dengan lookup UUID lama juga). Logika resolve-slug-lalu-query-signer sudah diverifikasi lewat unit test (`tests/paktaStore.test.ts`, memastikan query pakai kolom `slug`) dan code review manual (Task 5, trace lengkap alur `getAcaraByLink` → `listSigners(template.eventId)` → `get_pdf_upload_url` pakai UUID asli).
 
 ### Validation
 - Build: ✅ PASS
 - Lint: N/A (tidak ada script lint di proyek ini)
-- Test: ✅ 97/97 PASS
+- Test: ✅ 112/112 PASS
 
 ### Proses Eksekusi
-Subagent-Driven Development, 5 task implementasi + 1 task verifikasi:
-- Task 1 (router) — implementer model haiku, reviewer model sonnet, Approved (1 catatan Minor kosmetik).
-- Task 2 (Hub.tsx + CSS) — implementer haiku, reviewer sonnet, Approved (1 catatan Minor kosmetik).
-- Task 3 (topbar logo) — implementer haiku, reviewer sonnet, Approved (2 catatan Minor).
-- Task 4 (wiring App.tsx + breadcrumb) — implementer haiku, reviewer sonnet, Approved (1 catatan Minor soal command tsc, sudah diverifikasi controller — bukan bug nyata).
-- Task 5 (hapus tombol lama EventList) — implementer haiku, reviewer sonnet, Approved (0 catatan).
-- Task 6 (full suite/build/lint/manual verification) — dikerjakan langsung oleh controller (bukan subagent, karena tidak ada perubahan kode untuk didelegasikan).
+Subagent-Driven Development, 7 task implementasi + 1 task verifikasi:
+- Task 1 (migration SQL) — implementer haiku, reviewer sonnet. **Round 1: Needs fixes** — reviewer menemukan bug Important: nama kegiatan pendek (mis. "AB") menghasilkan slug 2 karakter yang melanggar CHECK constraint `length(slug) between 3 and 60` yang ditambahkan migration yang sama, membuat migration gagal di produksi. Controller juga menemukan risiko serupa untuk nama sangat panjang (tidak ada batas atas). Fix subagent memperbaiki backfill CTE (fallback 'acara' untuk nama <3 karakter, potong ke 55 karakter untuk nama panjang). **Round 2: Approved**, kedua bug diverifikasi benar-benar teratasi lewat trace manual independen.
+- Task 2 (slug.ts utility) — implementer haiku, reviewer sonnet, Approved (3 catatan Minor soal cakupan test).
+- Task 3 (api/pakta-admin.ts) — implementer haiku, reviewer sonnet, Approved (2 catatan Minor).
+- Task 4 (paktaStore.ts) — implementer haiku, reviewer sonnet, Approved (1 catatan Minor).
+- Task 5 (PaktaSignPage.tsx) — implementer haiku, reviewer sonnet, Approved (0 catatan).
+- Task 6 (PaktaDashboard.tsx, task terbesar) — implementer haiku, reviewer sonnet, Approved (2 catatan Minor).
+- Task 7 (wiring App.tsx/AppRouter.tsx) — implementer haiku, reviewer sonnet, Approved (0 catatan), diverifikasi independen `tsc -b` bersih.
+- Task 8 (full suite/build/manual verification) — dikerjakan langsung controller.
+- **Final whole-branch review** (model Opus, dispatch terpisah dari 8 task di atas) — **Round 1: Needs fixes**. Menemukan 1 bug Important **lintas-task** yang tidak terlihat oleh review per-task manapun: migration (Task 1) sudah menangani nama pendek/panjang dengan aman, tapi jalur runtime `create_event` (Task 3) TIDAK meniru pengamanan yang sama — nama seperti "K3" atau "PI" (singkatan umum instansi pemerintah, "PI" bahkan singkatan dari "Pakta Integritas" itu sendiri) akan menghasilkan slug 2 karakter yang melanggar CHECK constraint, membuat pembuatan acara gagal dengan error 500 yang membingungkan. Fix subagent menyamakan logika clamp `create_event` persis dengan migration (fallback 'acara' untuk <3 karakter, potong ke 55 karakter) + tambah test regresi. **Round 2: Ready to merge: Yes**, fix diverifikasi benar lewat trace independen (`"K3"` → fallback 'acara'; `"Pakta Baru"` → tidak berubah, tidak ada regresi), tidak ada temuan baru.
 
-Tidak ada Critical/Important di seluruh 5 task review. Final whole-branch review (dispatch terpisah, model paling capable) BELUM dijalankan — ini next step sebelum PR.
+Tidak ada Critical/Important yang belum diperbaiki — baik di 7 task review maupun final whole-branch review (setelah fix round 2). Test suite dikonfirmasi ulang independen oleh controller: 113/113 pass.
 
-Ledger progres lengkap: `.superpowers/sdd/progress.md`.
+Ledger progres lengkap: `.superpowers/sdd/progress.md` (bagian "Pakta Link Slug — SDD Progress Ledger").
 
-Commit (urutan kronologis):
-1. `830de31` — feat(router): add sertifikat view for the landing hub redesign
-2. `37d7fb5` — feat(hub): add Landing Hub component with Sertifikat/Pakta cards
-3. `4bff1a6` — feat(topbar): make logo a button that navigates to the hub
-4. `34a96f2` — feat(app): render Hub on home and move EventList to the sertifikat view
-5. `35b5a60` — chore(event-list): remove Pakta Integritas button, now handled by the Hub
+Commit (urutan kronologis, base `af1f96b`):
+1. `58cbaa7` — feat(pakta): add slug column migration for custom signing links (not executed)
+2. `8cc9e2e` — fix(pakta): handle short and overlong names in slug backfill migration
+3. `b8c39a6` — feat(pakta): add slugify/isValidSlug utility for custom signing links
+4. `b28b83d` — feat(pakta): auto-generate unique slug on create, validate + map conflicts on update
+5. `c694a9e` — feat(pakta): look up public event by slug instead of UUID
+6. `55ea30b` — feat(pakta): resolve public signer page by slug, use real UUID downstream
+7. `af84271` — feat(pakta): show slug-based public link, add inline slug editing
+8. `1665db8` — feat(pakta): wire slug prop from router into PaktaSignPage
+9. `652f9a6` — fix(pakta): clamp auto-generated slug length in create_event to satisfy DB constraint (dari final whole-branch review round 1)
 
-(Base untuk fitur ini: `b46dd81`, tip `main` sebelum implementasi dimulai — juga tip cabang ini sebelum Task 1.)
+(Base untuk fitur ini: `af1f96b`, commit terakhir sebelum implementasi dimulai — juga commit "docs: tambah spec, plan, dan handoff untuk Landing Hub" dari sesi sebelumnya.)
 
 ### Known Issues
-- Bookmark/link lama ke root (`#` kosong) sekarang mendarat di Hub, bukan langsung ke daftar sertifikat — perubahan perilaku yang disengaja (tujuan redesign), bukan regresi, sudah didokumentasikan di spec bagian "Non-Tujuan/Perilaku Baru".
-- Belum ada test otomatis untuk `App.tsx` (breadcrumb wiring) dan `EventList.tsx` (penghapusan tombol) — sesuai keputusan eksplisit di plan, karena `App.tsx` menarik context Supabase-backed yang membuat unit test tidak proporsional untuk perubahan sekecil ini. Diverifikasi manual lewat browser preview (lihat Commands Run di atas).
-- `npx tsc -b --noEmit` (command yang awalnya ditulis di plan Task 4 sebagai verifikasi) tidak bisa dijalankan di repo ini karena error `TS6310` yang sudah ada sebelum sesi ini (bukan disebabkan perubahan Landing Hub) — dicatat di sini supaya agent berikutnya tidak salah kira ini bug baru.
-- Belum ada final whole-branch code review (langkah terakhir sebelum PR menurut proses subagent-driven-development).
+- **Migration SQL belum dijalankan di Supabase produksi** — `supabase/migrations/0002_pakta_event_slug.sql` sudah ditulis dan direview (termasuk 1 putaran fix), tapi TIDAK dieksekusi oleh agent (sesuai aturan proyek soal database produksi). User perlu menjalankannya manual di Supabase SQL Editor SEBELUM fitur ini berfungsi — sebelum migration dijalankan, kolom `slug` tidak ada di database, jadi kode baru yang query `.eq('slug', ...)` akan gagal.
+- Halaman publik (`PaktaSignPage`) tidak bisa diverifikasi end-to-end lewat browser sungguhan di sandbox ini (tidak ada `.env`/kredensial Supabase) — lihat detail di Commands Run.
+- `PaktaSignPage.tsx` dan `PaktaDashboard.tsx` tidak punya test otomatis (keputusan eksplisit di plan — kedua file menarik context Supabase-backed yang membuat unit test tidak proporsional) — diverifikasi lewat `tsc` + manual browser (dashboard) dan code review (signer page).
+- Minor (dari final review, tidak di-fix, tidak mendesak): batas 3 karakter dan pemotongan 55 karakter terduplikasi di tiga tempat (`api/pakta-admin.ts`, `src/lib/slug.ts`, migration SQL) — konstanta bersama bisa mengurangi risiko drift di masa depan, tapi bukan bug.
 
 ### Next Step
-1. Dispatch final whole-branch code review (model paling capable) atas diff penuh `b46dd81..HEAD`.
-2. Kalau review bersih atau temuan sudah diperbaiki: minta approval user untuk push branch dan buat PR baru.
-3. Setelah PR & merge: user disarankan mengecek tampilan Hub di perangkat mobile sungguhan (bukan cuma viewport emulasi) untuk konfirmasi visual akhir.
+1. Minta approval user untuk push branch dan buat PR baru (semua review sudah bersih, siap merge).
+2. **Sebelum atau segera setelah merge:** user WAJIB menjalankan `supabase/migrations/0002_pakta_event_slug.sql` manual di Supabase SQL Editor produksi — fitur ini tidak akan berfungsi tanpa migration ini (kolom `slug` belum ada).
+3. Setelah migration jalan: user disarankan mencoba alur lengkap di kegiatan sungguhan (buat kegiatan baru → cek slug otomatis → ubah slug → buka link baru sebagai pegawai → tanda tangan) untuk konfirmasi end-to-end yang tidak bisa diuji di sandbox ini.

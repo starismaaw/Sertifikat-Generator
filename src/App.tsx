@@ -33,7 +33,7 @@ export default function App() {
 
   // Halaman publik — tidak butuh admin context
   if (view.name === 'pakta-signer') {
-    return <PaktaSignPage key={view.eventId} eventId={view.eventId} />;
+    return <PaktaSignPage key={view.eventId} slug={view.eventId} />;
   }
 
   const isPaktaView = view.name === 'pakta-admin' || view.name === 'pakta-editor' || view.name === 'pakta-dashboard';

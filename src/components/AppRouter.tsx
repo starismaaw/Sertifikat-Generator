@@ -8,7 +8,7 @@ export type View =
   | { name: 'pakta-admin' }
   | { name: 'pakta-editor'; eventId: string }
   | { name: 'pakta-dashboard'; eventId: string }
-  | { name: 'pakta-signer'; eventId: string };
+  | { name: 'pakta-signer'; eventId: string };  // eventId di sini adalah slug publik (lihat src/lib/slug.ts), bukan UUID
 
 export function parseHash(): View {
   const h = window.location.hash.replace(/^#/, '');

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FieldValues, PaktaTemplate } from '../../types';
-import { getAcaraPakta, listSigners, updateSignerDone, type SignerRow } from '../../lib/paktaStore';
+import { getAcaraByLink, listSigners, updateSignerDone, type SignerRow } from '../../lib/paktaStore';
 import { renderPakta } from '../../lib/pdfRenderer';
 import { matchesSignerQuery } from '../../lib/signerFilter';
 import { SignaturePad, type SignaturePadHandle } from './SignaturePad';
@@ -36,7 +36,7 @@ async function loadBackground(templatePath: string): Promise<string> {
   });
 }
 
-export function PaktaSignPage({ eventId }: { eventId: string }) {
+export function PaktaSignPage({ slug }: { slug: string }) {
   const [state, setState] = useState<PageState>({ step: 'loading' });
   const [loadKey, setLoadKey] = useState(0);
   const [query, setQuery] = useState('');
@@ -48,19 +48,18 @@ export function PaktaSignPage({ eventId }: { eventId: string }) {
     let cancelled = false;
     setState({ step: 'loading' });
     (async () => {
-      const [template, signers] = await Promise.all([
-        getAcaraPakta(eventId),
-        listSigners(eventId),
-      ]);
+      const template = await getAcaraByLink(slug);
       if (cancelled) return;
       if (!template) {
         setState({ step: 'notFound' });
         return;
       }
+      const signers = await listSigners(template.eventId);
+      if (cancelled) return;
       setState({ step: 'pickName', template, signers });
     })();
     return () => { cancelled = true; };
-  }, [eventId, loadKey]);
+  }, [slug, loadKey]);
 
   async function handleSelectSigner(signer: SignerRow) {
     if (state.step !== 'pickName') return;
@@ -98,7 +97,7 @@ export function PaktaSignPage({ eventId }: { eventId: string }) {
       const urlResp = await fetch('/api/pakta-signer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'get_pdf_upload_url', signerId: signer.id, eventId }),
+        body: JSON.stringify({ action: 'get_pdf_upload_url', signerId: signer.id, eventId: template.eventId }),
       });
       if (!urlResp.ok) {
         const err = await urlResp.json().catch(() => ({ error: 'Gagal menghubungi server' }));
