@@ -18,6 +18,11 @@ function textStyle(field: Field, scale: number, text: string): CSSProperties {
     fontStyle: italic ? 'italic' : 'normal',
     fontSize: size,
     color: field.warna,
+    // fitFontSizeCss menghitung ukuran agar teks satu baris muat dalam field.lebar,
+    // tapi pengukuran canvas vs layout DOM bisa beda sub-pixel — nowrap mencegah
+    // teks pecah ke baris baru (PDF akhir selalu satu baris; lihat overflow:hidden
+    // di wrapper div pemanggil untuk pengaman sisa sub-pixel).
+    whiteSpace: 'nowrap',
   };
 }
 
@@ -34,6 +39,7 @@ function TextFieldOverlay({ field, scale, text }: { field: Field; scale: number;
         top: field.y * scale,
         width: field.lebar * scale,
         textAlign: field.perataan,
+        overflow: 'hidden',
       }}
     >
       <span style={textStyle(field, scale, text)}>{text}</span>
@@ -55,6 +61,7 @@ function NamaNipOverlay({ field, scale, nama, nip }: { field: Field; scale: numb
           top: field.y * scale,
           width: field.lebar * scale,
           textAlign: field.perataan,
+          overflow: 'hidden',
         }}
       >
         <span style={{ ...textStyle(field, scale, nama), textDecoration: 'underline' }}>{nama}</span>
@@ -66,6 +73,7 @@ function NamaNipOverlay({ field, scale, nama, nip }: { field: Field; scale: numb
           top: field.y * scale + lineHeight,
           width: field.lebar * scale,
           textAlign: field.perataan,
+          overflow: 'hidden',
         }}
       >
         <span style={textStyle(field, scale, nipText)}>{nipText}</span>
