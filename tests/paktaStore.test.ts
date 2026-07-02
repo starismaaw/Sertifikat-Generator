@@ -1,16 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // All mock vars inside vi.hoisted() to avoid TDZ errors with vi.mock hoisting
-const { singleMock, selectMock, updateMock, fromMock } = vi.hoisted(() => {
+const { singleMock, selectMock, updateMock, fromMock, eqEventsMock } = vi.hoisted(() => {
   const singleMock = vi.fn();
   const selectMock = vi.fn();
   const updateMock = vi.fn();
+  const eqEventsMock = vi.fn().mockReturnValue({ single: singleMock });
   const fromMock = vi.fn((table: string) => {
     if (table === 'pakta_events') {
       return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({ single: singleMock }),
-        }),
+        select: vi.fn().mockReturnValue({ eq: eqEventsMock }),
       };
     }
     if (table === 'pakta_signers') {
@@ -18,22 +17,23 @@ const { singleMock, selectMock, updateMock, fromMock } = vi.hoisted(() => {
     }
     return {};
   });
-  return { singleMock, selectMock, updateMock, fromMock };
+  return { singleMock, selectMock, updateMock, fromMock, eqEventsMock };
 });
 
 vi.mock('../src/lib/supabaseClient', () => ({
   getSupabaseClient: vi.fn().mockReturnValue({ from: fromMock }),
 }));
 
-import { getAcaraPakta, listSigners, updateSignerDone } from '../src/lib/paktaStore';
+import { getAcaraByLink, listSigners, updateSignerDone } from '../src/lib/paktaStore';
 
-describe('getAcaraPakta', () => {
+describe('getAcaraByLink', () => {
   beforeEach(() => {
     singleMock.mockReset();
     fromMock.mockClear();
+    eqEventsMock.mockClear();
   });
 
-  it('mengembalikan PaktaTemplate bila acara ditemukan dan aktif', async () => {
+  it('mengembalikan PaktaTemplate bila acara ditemukan lewat slug dan aktif', async () => {
     singleMock.mockResolvedValue({
       data: {
         id: 'ev1',
@@ -50,18 +50,21 @@ describe('getAcaraPakta', () => {
       error: null,
     });
 
-    const result = await getAcaraPakta('ev1');
+    const result = await getAcaraByLink('pelatihan-2026');
     // WHY: fungsi harus mengembalikan PaktaTemplate (background diisi setelah template_path diketahui)
     expect(result).not.toBeNull();
+    expect(result!.eventId).toBe('ev1');
     expect(result!.bgWidth).toBe(800);
     expect(result!.bgHeight).toBe(600);
     expect(result!.fields).toHaveLength(1);
+    // WHY: lookup harus lewat kolom slug, bukan lagi id — ini inti dari perubahan link custom.
+    expect(eqEventsMock).toHaveBeenCalledWith('slug', 'pelatihan-2026');
   });
 
-  it('mengembalikan null bila acara tidak ditemukan (error Supabase)', async () => {
+  it('mengembalikan null bila slug tidak ditemukan (error Supabase)', async () => {
     singleMock.mockResolvedValue({ data: null, error: { message: 'Not found' } });
-    const result = await getAcaraPakta('tidak-ada');
-    // WHY: halaman publik harus handle acara tidak ada dengan graceful
+    const result = await getAcaraByLink('slug-tidak-ada');
+    // WHY: halaman publik harus handle acara tidak ada dengan graceful, termasuk slug lama/salah
     expect(result).toBeNull();
   });
 
@@ -70,7 +73,7 @@ describe('getAcaraPakta', () => {
       data: { id: 'ev2', status: 'ditutup', bg_width: 800, bg_height: 600, fields: [] },
       error: null,
     });
-    const result = await getAcaraPakta('ev2');
+    const result = await getAcaraByLink('pelatihan-2026');
     // WHY: pegawai tidak boleh tanda tangan setelah acara ditutup
     expect(result).toBeNull();
   });
