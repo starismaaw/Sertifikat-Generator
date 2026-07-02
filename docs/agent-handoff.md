@@ -1,47 +1,56 @@
 ## Agent Handoff
 
 **Branch:** `claude/sharp-chaum-8bf41f`
-**Task:** Dua bug laporan user di halaman signing Pakta Integritas versi mobile: (1) kotak tanda tangan melebar sangat jauh dari field template, (2) tombol overlay "Hapus Tanda Tangan" menutupi hasil preview tanda tangan.
-**Last agent:** Claude Sonnet 5 (Claude Code), via skill `systematic-debugging`
-**Status:** SELESAI. Root cause diinvestigasi & diperbaiki untuk kedua bug. Build ✅, test 139/139 ✅. Verifikasi visual manual di browser (mobile viewport 375px) via harness sementara (tidak dikomit — direvert dengan `git checkout` setelah verifikasi). **Belum di-push/PR/merge** — menunggu instruksi eksplisit user.
+**Task:** Setelah PR #33 (kotak TTD melebar/tombol Hapus menutupi preview di mobile) merge ke main, user melaporkan 2 bug baru: (1) hasil tanda tangan di PDF akhir tidak sesuai placement/bentuk dengan template saat ditandatangani dari mobile, (2) coretan tanda tangan di mobile terlihat sangat tebal & tidak natural.
+**Last agent:** Claude Sonnet 5 (Claude Code), via skill `systematic-debugging` → `brainstorming` → `writing-plans` → `subagent-driven-development`
+**Status:** SELESAI (2 fix terpisah, root cause berbeda). Final whole-branch review: **Ready to merge**, 0 Critical/Important. Build ✅, test 141/141 ✅. **Belum di-push/PR/merge** — menunggu instruksi eksplisit user (lihat PR #33 untuk pola commit sebelumnya di sesi yang sama).
 
-### Root cause (bug 1 — kotak TTD melebar jauh dari field template)
-Ini adalah patch ke-5 berturut-turut di logic yang sama (`930cad9` → `0d93a71` → `6aea5f2` → `9c31d31` → `6dd2e6b`), masing-masing memperbaiki satu gejala tapi memunculkan gejala lain — pola klasik "growFactor bersama untuk lebar & tinggi" yang saling tarik-menarik. Root cause: `computeSignatureBox` (di `src/lib/paktaPreviewLayout.ts`) menghitung `heightGrowFactor` dari kebutuhan tinggi minimum (`MIN_SIGNATURE_HEIGHT=140px`), lalu memakai faktor yang SAMA untuk membesarkan lebar demi mempertahankan rasio field. Secara aljabar ini membuat lebar hasil = `(field.lebar/field.tinggi) * 140` — rumus yang **device/scale-independent**. Untuk field lebar-tapi-pendek (default field TTD: rasio 2.5:1, atau kasus ekstrem lain), setelah di-clamp ke `containerW`, kotak jadi selebar hampir SELURUH dokumen di layar mobile sempit, walau field aslinya cuma sebagian kecil lebar dokumen. Test lama (`tests/paktaPreviewLayout.test.ts`) bahkan sudah men-dokumentasikan perilaku ini sebagai "expected" (`width: 350` = persis lebar dokumen).
+### Referensi
+- Spec fix #1: `docs/superpowers/specs/2026-07-02-pakta-signature-natural-fit-design.md`
+- Plan fix #1: `docs/superpowers/plans/2026-07-02-pakta-signature-natural-fit.md`
+- Spec fix #2: `docs/superpowers/specs/2026-07-02-pakta-signature-canvas-resolution-race-design.md`
+- Plan fix #2: `docs/superpowers/plans/2026-07-02-pakta-signature-canvas-resolution-race.md`
+- Ledger progres SDD: `.superpowers/sdd/progress.md`
 
-**Fix:** Lebar & tinggi kotak sekarang dihitung SEPENUHNYA INDEPENDEN — masing-masing punya minimum sendiri (`MIN_SIGNATURE_WIDTH=140`, baru; `MIN_SIGNATURE_HEIGHT=140`, sudah ada) dan di-clamp terpisah ke `containerW`/`containerH`. Tidak ada lagi growFactor bersama. Ini juga menyederhanakan kode (menghapus `heightGrowFactor`/`proportionalWidth`).
+### Ringkasan: Dua Root Cause Terpisah, Satu Gejala Laporan User
 
-### Root cause (bug 2 — tombol Hapus Tanda Tangan menutupi preview)
-Tombol lama pakai class `apple-btn apple-btn-secondary apple-btn-sm` berisi teks penuh "Hapus Tanda Tangan", diposisikan absolute overlay di pojok kanan-bawah kotak TTD. Class `.apple-btn-sm` punya aturan `min-height: 44px` yang dipaksakan di bawah viewport 480px (aturan touch-target aksesibilitas Apple HIG), sehingga di mobile tombol jadi ±150px lebar × 44px tinggi — di kotak TTD yang (sebelum fix bug 1) sudah kecil, tombol ini menutupi sebagian besar area gambar tanda tangan.
+Investigasi (manual browser verification, bukan cuma baca kode) menemukan gejala yang dilaporkan user disebabkan **dua bug independen di layer berbeda**, keduanya harus diperbaiki bersama:
 
-**Fix:** Ganti ke convention icon-only yang sudah ada di codebase (`sg-btn sg-btn-icon`, dipakai di `PaktaEditor.tsx`, `EventCard.tsx`, `PaktaEventList.tsx` — 34×34px, SVG `TrashIcon` lokal per-file, `aria-label`/`title` untuk aksesibilitas). Jauh lebih kecil, tidak lagi tertimpa aturan `min-height:44px` yang khusus untuk `.apple-btn-sm`.
+**Fix #1 — Contain-fit saat embed ke PDF** (`src/lib/pdfRenderer.ts`, `renderPakta`, commit `8cee4e9`):
+`page.drawImage` sebelumnya stretch gambar tanda tangan paksa ke `field.lebar × field.tinggi` tanpa peduli rasio asli gambar. Diganti pakai `sigImage.scaleToFit(field.lebar, h)` (bawaan pdf-lib, setara `object-fit:contain`) + di-centering manual — gambar sekarang di-scale seragam (rasio terjaga) lalu dipusatkan di kotak field, bukan di-stretch non-uniform.
 
-### Ringkasan Perubahan
-- `src/lib/paktaPreviewLayout.ts` — `computeSignatureBox` disederhanakan: lebar & tinggi independen, tanpa growFactor bersama. `MIN_SIGNATURE_WIDTH=140` baru diekspor.
-- `tests/paktaPreviewLayout.test.ts` — nilai expected diupdate sesuai logic baru; 1 test lama yang men-dokumentasikan bug (`width:350`) diupdate; 1 test regresi baru khusus memastikan kotak tidak melebar jauh melebihi lebar asli field.
-- `src/components/pakta-signer/PaktaDocumentPreview.tsx` — tombol hapus TTD diganti dari `apple-btn-sm` teks penuh → `sg-btn sg-btn-icon` (34×34, ikon trash lokal).
+**Fix #2 — Race kondisi resolusi kanvas** (`src/components/pakta-signer/PaktaDocumentPreview.tsx`, commit `8b5c48e`):
+Ditemukan SAAT verifikasi manual fix #1 — kanvas `SignaturePad` bisa mengunci resolusi internal (`canvas.width`/`height`) ke ukuran SALAH (rasio field asli, mis. 960×384) sejak render pertama, walau kotak yang TERLIHAT di layar sudah benar (mis. 177×140) — karena `PaktaDocumentPreview` mengoreksi `scale` lewat `useEffect` (passive/async) yang bisa berjalan SETELAH `SignaturePad`'s sendiri `useEffect` (juga passive) sudah telanjur mengukur & mengunci ukuran salah. Diverifikasi empiris REPRODUCIBLE (bukan race sesaat) lewat reload penuh & resize viewport sungguhan. Fix: ganti `useEffect`→`useLayoutEffect` di efek koreksi scale — menjamin koreksi selesai SINKRON sebelum browser paint & sebelum efek passive turunan manapun berjalan.
+
+**Kenapa keduanya perlu, tidak cukup salah satu** (dikonfirmasi final reviewer): fix #1 saja tidak bisa memperbaiki distorsi yang SUDAH terjadi di piksel sumber (kanvas capture salah resolusi sejak awal). Fix #2 saja tidak cukup karena `computeSignatureBox` (PR #33) SENGAJA membuat rasio kotak layar ≠ rasio field asli (touch-target usability) — begitu kanvas capture benar, embed-nya tetap perlu contain-fit supaya tidak di-stretch ulang saat rasio box vs field legitimately berbeda.
+
+### Bug ditemukan & diperbaiki selama proses
+1. **Contain-fit (fix #1):** ditemukan lewat systematic-debugging awal atas laporan user — bukti: test lama (`tests/paktaPreviewLayout.test.ts`, sebelum sesi ini) sudah men-dokumentasikan stretch-fill sebagai "expected" untuk kotak yang di-clamp PR #33.
+2. **Canvas resolution race (fix #2):** ditemukan TIDAK LEWAT baca kode, tapi lewat verifikasi manual browser sungguhan untuk fix #1 (harness sementara + `preview_*` tools) — nilai `canvas.width`/`height` ternyata tidak cocok dengan `canvas.offsetWidth`/`height × devicePixelRatio`, reproducible di berbagai kondisi. Root-caused ke urutan efek React (`useEffect` vs `useLayoutEffect`) sebelum diperbaiki.
 
 ### Verifikasi manual yang sudah dilakukan
-Harness sementara di `src/App.tsx` (route `?debugSigBox=1` merender `PaktaDocumentPreview` langsung dengan template fixture, background SVG data-URI) dipakai untuk verifikasi visual lewat `preview_*` tools di viewport mobile 375px, lalu DIREVERT (`git checkout -- src/App.tsx`) — tidak ada jejak di working tree:
-- ✅ Field TTD 400×120 (rasio lebar-pendek, sama seperti default field TTD di editor) pada dokumen 1000px lebar, container mobile 343px: kotak jadi **140×140px** (dikonfirmasi `getBoundingClientRect()`), BUKAN ±343px (hampir selebar dokumen) seperti sebelum fix.
-- ✅ Menggambar tanda tangan (via `PointerEvent` sintetis realistis dengan delay antar-event) → tombol hapus (ikon kecil pojok kanan-bawah) TIDAK menutupi coretan tanda tangan (dikonfirmasi screenshot).
-- ✅ Klik tombol hapus → kanvas kosong, hint "Tanda tangan di sini" muncul kembali.
+Semua lewat harness sementara di `src/App.tsx` (query param `?debugSigFit=1` / `?debugCanvasRace=1`, TIDAK dikomit — dibuat, diverifikasi, lalu `git checkout` setiap kali) + `preview_*` tools:
+- ✅ Fix #1: render `renderPakta` sungguhan dengan signature PNG hasil tangkap real (bukan fixture 1×1), cek `cm` operator PDF — bentuk yang di-embed proporsional & tersentral, bukan stretch.
+- ✅ Fix #2, saat mount: `canvas.width`/`height` (330×280) SAMA dengan `canvas.offsetWidth`/`height × dpr` (330×280) — sebelum fix, ini 960×384 (salah, mengikuti rasio field 2.5:1, bukan rasio kotak layar).
+- ✅ Fix #2, setelah resize viewport sungguhan (375→400px): tetap sinkron (354×280 = 354×280) — konfirmasi `ResizeObserver` untuk resize LANJUTAN tetap berfungsi, fix hanya menghilangkan race di INISIALISASI.
+- ✅ End-to-end kedua fix bersama: gambar tanda tangan sederhana (PointerEvent sintetis) → screenshot menunjukkan coretan tipis & tidak terdistorsi.
 
-**Belum diverifikasi:** alur signing end-to-end dengan Supabase asli (perlu `.env` kredensial valid + event/signer nyata) dan desktop viewport (perubahan ini menurut analisis matematis tidak berpengaruh di desktop, karena `rawHeight` biasanya sudah ≥ `MIN_SIGNATURE_HEIGHT` di container lebar — konsisten dengan laporan bug sebelumnya bahwa desktop "sudah benar").
+**Belum diverifikasi:** alur signing end-to-end dengan Supabase asli (perlu `.env` kredensial valid + event/signer nyata) dan pengujian di perangkat mobile fisik sungguhan (bukan emulasi viewport).
 
 ### Commands Run
 ```
 npm install
 npm run build   # tsc -b && vite build — PASS
-npm run test    # 22 files, 139/139 tests — PASS
+npm run test    # 22 file, 141/141 test — PASS
 ```
-**Catatan jujur:** tidak ada script `lint` di `package.json` (pre-existing, di luar scope perubahan ini).
+Tidak ada script `lint` di `package.json` (pre-existing, di luar scope).
 
 ### Known Issues
+- Fix #2 (`useLayoutEffect`) tidak punya automated test coverage — dicatat eksplisit di spec sebagai keterbatasan sengaja (race timing browser nyata tidak tereproduksi di jsdom, `ResizeObserverStub` di `tests/setup.ts` no-op). Final reviewer menandai ini sebagai risiko regresi jangka panjang (Minor, tidak blocking): kalau nanti ada yang tanpa sadar mengubah `useLayoutEffect` balik ke `useEffect`, tidak ada test yang akan gagal untuk menangkapnya.
 - Tidak ada script `lint` di project (pre-existing).
 - Bundle JS utama >2MB setelah build (warning Vite, pre-existing, tidak terkait perubahan ini).
-- Verifikasi Supabase end-to-end belum bisa dilakukan di worktree ini — disarankan dites manual sekali lagi di environment dengan `.env` terisi sebelum merge ke `main`.
 
 ### Next Step
 1. User me-review perubahan (atau minta code review lewat `/code-review`).
-2. Push branch & buat PR hanya setelah user eksplisit minta.
-3. Sebelum atau sesudah merge: uji manual sekali dengan Supabase environment nyata di HP sungguhan untuk menutup gap verifikasi di atas.
+2. Push branch & buat PR hanya setelah user eksplisit minta (pola commit yang sama seperti PR #33 di sesi sebelumnya — commit sudah dilakukan bertahap oleh subagent, working tree bersih, tinggal push+PR+merge kalau diminta).
+3. Sebelum atau sesudah merge: uji manual sekali dengan Supabase environment nyata di HP fisik sungguhan (bukan viewport emulasi) untuk menutup gap verifikasi di atas.
