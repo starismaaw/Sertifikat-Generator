@@ -54,16 +54,18 @@ describe('computeSignatureBox', () => {
 
   it('tidak membiarkan kotak melebar keluar dari dokumen saat growFactor besar di layar sempit (bug: field kecil di mobile)', () => {
     // Simulasi nyata: template 2000x2500px, field TTD 400x120, dilihat di layar mobile
-    // (containerWidth ~350px -> scale=0.175). rawWidth=70, rawHeight=21 -> growFactor
-    // "ideal" untuk capai MIN_SIGNATURE_HEIGHT adalah 140/21=6.67, yang akan membuat
-    // width=466.67 -- lebih lebar dari containerW (350) itu sendiri. Lebar kotak harus
-    // dibatasi agar tidak pernah melebihi containerW/containerH, walau artinya tinggi
-    // akhir jadi kurang dari MIN_SIGNATURE_HEIGHT.
+    // (containerWidth ~350px -> scale=0.175). rawWidth=70, rawHeight=21. Lebar kotak
+    // dibatasi agar tidak pernah melebihi containerW/containerH (di sini width=350,
+    // pas selebar dokumen). TAPI tinggi TETAP diusahakan capai MIN_SIGNATURE_HEIGHT
+    // penuh (140) walau itu berarti rasio lebar:tinggi kotak di layar tidak lagi
+    // persis sama dengan field.lebar:tinggi -- lebih baik area gambar tetap nyaman
+    // (140px) daripada dipepetkan ikut lebar (105px, bug sebelumnya: TTD jadi kecil
+    // saat distretch ke ukuran field asli di PDF).
     const field = { x: 1600, y: 2000, lebar: 400, tinggi: 120 };
     const box = computeSignatureBox(field, 0.175, 2000, 2500);
     expect(box.width).toBeLessThanOrEqual(2000 * 0.175);
     expect(box.height).toBeLessThanOrEqual(2500 * 0.175);
-    expect(box).toEqual({ left: 0, top: 308, width: 350, height: 105 });
+    expect(box).toEqual({ left: 0, top: 290.5, width: 350, height: 140 });
   });
 });
 
