@@ -4,6 +4,10 @@ import { navigate } from '../AppRouter';
 import { usePaktaAdmin } from '../../contexts/PaktaAdminContext';
 import { ImportSignersModal } from './ImportSignersModal';
 import { matchesSignerQuery } from '../../lib/signerFilter';
+import { buildZip, downloadBlob } from '../../lib/download';
+
+type BulkDownloadPhase = 'idle' | 'fetching' | 'zipping';
+const BULK_CONCURRENCY = 5;
 
 interface Signer {
   id: string;
@@ -32,6 +36,10 @@ export function PaktaDashboard({ eventId }: { eventId: string }) {
   const [showImport, setShowImport] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [bulkPhase, setBulkPhase] = useState<BulkDownloadPhase>('idle');
+  const [bulkDone, setBulkDone] = useState(0);
+  const [bulkTotal, setBulkTotal] = useState(0);
+  const [bulkCurrentName, setBulkCurrentName] = useState('');
 
   const publicUrl = `${window.location.origin}/#pakta/${eventId}`;
 
@@ -97,6 +105,59 @@ export function PaktaDashboard({ eventId }: { eventId: string }) {
     matchesSignerQuery(s.nama, query) || matchesSignerQuery(s.nip, query)
   );
 
+  async function downloadAllPdfs() {
+    if (!event) return;
+    const signed = signers.filter(s => s.status === 'sudah' && s.pdf_path);
+    if (signed.length === 0) return;
+
+    setBulkPhase('fetching');
+    setBulkDone(0);
+    setBulkTotal(signed.length);
+    setBulkCurrentName('');
+
+    try {
+      const paths = signed.map(s => s.pdf_path as string);
+      const { urls } = await callAdmin<{ urls: Record<string, string> }>('get_bulk_signed_urls', { paths });
+
+      const files: { name: string; bytes: Uint8Array }[] = new Array(signed.length);
+      let doneCount = 0;
+
+      async function fetchOne(index: number) {
+        const s = signed[index];
+        setBulkCurrentName(s.nama);
+        const url = urls[s.pdf_path as string];
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error(`Gagal mengunduh PDF ${s.nama}`);
+        const bytes = new Uint8Array(await resp.arrayBuffer());
+        files[index] = { name: `pakta-${s.nama.replace(/\s+/g, '_')}.pdf`, bytes };
+        doneCount++;
+        setBulkDone(doneCount);
+      }
+
+      let cursor = 0;
+      async function worker() {
+        while (cursor < signed.length) {
+          const index = cursor++;
+          await fetchOne(index);
+        }
+      }
+      await Promise.all(Array.from({ length: Math.min(BULK_CONCURRENCY, signed.length) }, worker));
+
+      setBulkPhase('zipping');
+      setBulkCurrentName('');
+      const zip = await buildZip(files);
+
+      downloadBlob(zip, `Pakta - ${event.nama}.zip`, 'application/zip');
+    } catch (err) {
+      alert((err as Error).message);
+    } finally {
+      setBulkPhase('idle');
+      setBulkDone(0);
+      setBulkTotal(0);
+      setBulkCurrentName('');
+    }
+  }
+
   return (
     <div className="apple-page apple-page-wide">
       {/* Header */}
@@ -133,7 +194,30 @@ export function PaktaDashboard({ eventId }: { eventId: string }) {
             <button className="sg-btn sg-btn-outline" onClick={load}>
               Refresh
             </button>
+            <button
+              className="sg-btn sg-btn-outline"
+              disabled={sudahCount === 0 || bulkPhase !== 'idle'}
+              onClick={downloadAllPdfs}
+            >
+              {bulkPhase === 'idle' ? 'Unduh Semua (ZIP)' : '…'}
+            </button>
           </div>
+
+          {bulkPhase !== 'idle' && (
+            <div className="apple-progress" style={{ marginBottom: 16 }}>
+              <div className="apple-progress-phase">
+                {bulkPhase === 'fetching'
+                  ? `Mengunduh ${bulkDone} dari ${bulkTotal}${bulkCurrentName ? ` · ${bulkCurrentName}` : ''}`
+                  : 'Mengemas ZIP…'}
+              </div>
+              <div className="apple-progress-track">
+                <div
+                  className={`apple-progress-fill ${bulkPhase === 'zipping' ? 'indeterminate' : ''}`}
+                  style={bulkPhase === 'fetching' ? { width: `${Math.round((bulkDone / bulkTotal) * 100)}%` } : undefined}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Tabel signer */}
           {signers.length === 0 ? (
