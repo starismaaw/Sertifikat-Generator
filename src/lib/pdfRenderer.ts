@@ -37,7 +37,7 @@ export function toCssFont(fontFamily: string, fontWeight: FontWeight, size: numb
 
 // Use browser canvas measurement so PDF centering matches the Konva preview exactly.
 // Falls back to pdf-lib AFM metrics when canvas is unavailable (test / SSR env).
-function browserTextWidth(
+export function browserTextWidth(
   text: string,
   fontFamily: string,
   fontWeight: FontWeight,

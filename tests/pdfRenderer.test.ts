@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { PDFDocument, PDFName, PDFRawStream, PDFRef, PDFArray, decodePDFRawStream } from 'pdf-lib';
-import { renderCertificate, renderPakta, PNG_1x1, toCssFont } from '../src/lib/pdfRenderer';
+import { renderCertificate, renderPakta, PNG_1x1, toCssFont, browserTextWidth } from '../src/lib/pdfRenderer';
 import type { CertEvent, PaktaTemplate } from '../src/types';
 
 function makeEvent(): CertEvent {
@@ -221,5 +221,13 @@ describe('toCssFont', () => {
     expect(toCssFont('Open Sans', 'Italic', 32)).toBe('italic 400 32px "Open Sans"');
     expect(toCssFont('Open Sans', 'SemiBoldItalic', 32)).toBe('italic 600 32px "Open Sans"');
     expect(toCssFont('Open Sans', 'BoldItalic', 32)).toBe('italic 700 32px "Open Sans"');
+  });
+});
+
+describe('browserTextWidth', () => {
+  it('mengembalikan angka via afmFallback saat canvas 2d context tidak tersedia (lingkungan test)', () => {
+    const width = browserTextWidth('Contoh Teks', 'Inter', 'Regular', 20, () => 123);
+    expect(typeof width).toBe('number');
+    expect(width).toBe(123);
   });
 });

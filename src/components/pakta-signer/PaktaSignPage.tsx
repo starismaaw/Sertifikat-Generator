@@ -4,6 +4,7 @@ import { getAcaraByLink, listSigners, updateSignerDone, type SignerRow } from '.
 import { renderPakta } from '../../lib/pdfRenderer';
 import { matchesSignerQuery } from '../../lib/signerFilter';
 import { SignaturePad, type SignaturePadHandle } from './SignaturePad';
+import { PaktaDocumentPreview } from './PaktaDocumentPreview';
 
 type PageState =
   | { step: 'loading' }
@@ -245,7 +246,16 @@ export function PaktaSignPage({ slug }: { slug: string }) {
   }
 
   if (state.step === 'signing') {
-    const { template, signer } = state;
+    const { template, signer, backgroundDataUrl } = state;
+    const values: FieldValues = {
+      nama: signer.nama,
+      nip: signer.nip,
+      jabatan: signer.jabatan,
+      tanggal: template.tanggal,
+    };
+    const previewTemplate: PaktaTemplate = { ...template, background: backgroundDataUrl };
+    const hasSigField = template.fields.some(f => f.tipe === 'tandaTangan');
+
     return (
       <div className="apple-page">
         <div className="apple-page-compact">
@@ -257,24 +267,30 @@ export function PaktaSignPage({ slug }: { slug: string }) {
             ← Pilih Nama Lain
           </button>
 
-          <div className="apple-card" style={{ marginBottom: 20 }}>
-            <h2 className="apple-h2" style={{ marginBottom: 4 }}>{template.nama}</h2>
-            <p style={{ color: 'var(--color-ink-faint)', fontSize: 13 }}>
-              {signer.nama}
-              {signer.nip ? ` — ${signer.nip}` : ''}
-              {signer.jabatan ? ` — ${signer.jabatan}` : ''}
-            </p>
+          <div
+            style={{
+              position: 'relative',
+              marginBottom: 20,
+              borderRadius: 'var(--apple-radius-lg)',
+              overflow: 'hidden',
+              boxShadow: 'var(--shadow-soft)',
+            }}
+          >
+            <PaktaDocumentPreview
+              ref={hasSigField ? sigPadRef : undefined}
+              template={previewTemplate}
+              values={values}
+            />
           </div>
 
-          <div className="apple-card" style={{ marginBottom: 20 }}>
-            <p style={{ fontWeight: 600, fontSize: 13, marginBottom: 12 }}>
-              Tanda Tangan Anda
-            </p>
-            <p style={{ color: 'var(--color-ink-faint)', fontSize: 12, marginBottom: 12 }}>
-              Gambar tanda tangan di kotak di bawah ini menggunakan jari atau mouse.
-            </p>
-            <SignaturePad ref={sigPadRef} />
-          </div>
+          {!hasSigField && (
+            <div className="apple-card" style={{ marginBottom: 20 }}>
+              <p style={{ color: 'var(--color-ink-faint)', fontSize: 12, marginBottom: 12 }}>
+                Template ini belum memiliki area tanda tangan yang ditentukan. Gambar tanda tangan Anda di kotak berikut.
+              </p>
+              <SignaturePad ref={sigPadRef} />
+            </div>
+          )}
 
           <button
             className="apple-btn apple-btn-primary"
