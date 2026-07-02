@@ -165,6 +165,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ url: data.signedUrl });
     }
 
+    case 'get_bulk_signed_urls': {
+      const { paths } = body as { paths: string[] };
+      if (!Array.isArray(paths) || paths.length === 0) {
+        return res.status(400).json({ error: 'paths wajib diisi' });
+      }
+
+      const urls: Record<string, string> = {};
+      for (const path of paths) {
+        const { data, error } = await sb.storage
+          .from('pakta-documents')
+          .createSignedUrl(path, 3600);
+        if (error || !data) return res.status(500).json({ error: error?.message ?? `Gagal membuat signed URL untuk ${path}` });
+        urls[path] = data.signedUrl;
+      }
+      return res.status(200).json({ urls });
+    }
+
     case 'get_template_upload_url': {
       const { path } = body as { path: string };
       if (!path) return res.status(400).json({ error: 'path wajib diisi' });

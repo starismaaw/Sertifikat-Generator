@@ -264,4 +264,52 @@ describe('pakta-admin handler', () => {
     await handler(mockReq({ action: 'reset_signer' }), res);
     expect(res.statusCode).toBe(400);
   });
+
+  // WHY: unduh massal butuh semua signed URL dalam SATU panggilan backend
+  // (bukan N panggilan terpisah) supaya tidak membanjiri Vercel untuk acara
+  // besar (skala ~150 peserta).
+  it('get_bulk_signed_urls mengembalikan signed URL untuk semua path dalam satu panggilan', async () => {
+    const createSignedUrlMock = vi.fn()
+      .mockResolvedValueOnce({ data: { signedUrl: 'https://storage.test/s1.pdf?token=aaa' }, error: null })
+      .mockResolvedValueOnce({ data: { signedUrl: 'https://storage.test/s2.pdf?token=bbb' }, error: null });
+    const storageFromMock = vi.fn().mockReturnValue({ createSignedUrl: createSignedUrlMock });
+
+    createClientMock.mockReturnValue({ from: fromAdminMock, storage: { from: storageFromMock } });
+
+    const res = mockRes();
+    await handler(mockReq({ action: 'get_bulk_signed_urls', paths: ['ev1/s1.pdf', 'ev1/s2.pdf'] }), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.urls).toEqual({
+      'ev1/s1.pdf': 'https://storage.test/s1.pdf?token=aaa',
+      'ev1/s2.pdf': 'https://storage.test/s2.pdf?token=bbb',
+    });
+    expect(storageFromMock).toHaveBeenCalledWith('pakta-documents');
+    expect(createSignedUrlMock).toHaveBeenCalledTimes(2);
+  });
+
+  // WHY: kalau salah satu path gagal dibuatkan signed URL, jangan kembalikan
+  // hasil parsial yang membingungkan — gagalkan seluruh request.
+  it('get_bulk_signed_urls mengembalikan 500 kalau salah satu path gagal', async () => {
+    const createSignedUrlMock = vi.fn()
+      .mockResolvedValueOnce({ data: { signedUrl: 'https://storage.test/s1.pdf?token=aaa' }, error: null })
+      .mockResolvedValueOnce({ data: null, error: { message: 'File tidak ditemukan' } });
+    const storageFromMock = vi.fn().mockReturnValue({ createSignedUrl: createSignedUrlMock });
+
+    createClientMock.mockReturnValue({ from: fromAdminMock, storage: { from: storageFromMock } });
+
+    const res = mockRes();
+    await handler(mockReq({ action: 'get_bulk_signed_urls', paths: ['ev1/s1.pdf', 'ev1/s2.pdf'] }), res);
+
+    expect(res.statusCode).toBe(500);
+  });
+
+  // WHY: paths kosong/tidak ada berarti tidak ada yang perlu diunduh —
+  // tolak sebelum menyentuh Supabase.
+  it('get_bulk_signed_urls menolak bila paths kosong', async () => {
+    fromAdminMock.mockReturnValue({});
+    const res = mockRes();
+    await handler(mockReq({ action: 'get_bulk_signed_urls', paths: [] }), res);
+    expect(res.statusCode).toBe(400);
+  });
 });
