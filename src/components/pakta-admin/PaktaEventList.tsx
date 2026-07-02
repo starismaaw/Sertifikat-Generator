@@ -52,9 +52,9 @@ function PaktaCard({
   return (
     <>
       <article className="apple-card" style={{ marginBottom: 12 }}>
-        <div className="apple-card-body" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 2 }}>{event.nama}</div>
+        <div className="apple-card-body" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 2, overflowWrap: 'break-word' }}>{event.nama}</div>
             <div className="apple-caption" style={{ color: 'var(--color-ink-muted)' }}>
               {event.tanggal}
               {' · '}
@@ -63,7 +63,7 @@ function PaktaCard({
               </span>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button
               className="sg-btn sg-btn-outline"
               onClick={() => navigate({ name: 'pakta-editor', eventId: event.id })}
@@ -148,9 +148,9 @@ export function PaktaEventList() {
 
   return (
     <div className="apple-page apple-page-compact">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 20 }}>
         <h1 className="apple-h1">Pakta Integritas</h1>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button className="sg-btn sg-btn-primary" onClick={() => setShowNew(true)}>
             <PlusIcon /> Buat Acara
           </button>
