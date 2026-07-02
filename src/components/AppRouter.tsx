@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 
 export type View =
   | { name: 'home' }
+  | { name: 'sertifikat' }
   | { name: 'editor'; eventId: string }
   | { name: 'generate'; eventId: string }
   | { name: 'pakta-admin' }
@@ -9,9 +10,10 @@ export type View =
   | { name: 'pakta-dashboard'; eventId: string }
   | { name: 'pakta-signer'; eventId: string };
 
-function parseHash(): View {
+export function parseHash(): View {
   const h = window.location.hash.replace(/^#/, '');
   const [name, id] = h.split('/');
+  if (name === 'sertifikat')             return { name: 'sertifikat' };
   if (name === 'editor' && id)           return { name: 'editor', eventId: id };
   if (name === 'generate' && id)         return { name: 'generate', eventId: id };
   if (name === 'pakta-admin')            return { name: 'pakta-admin' };
@@ -23,6 +25,7 @@ function parseHash(): View {
 
 export function navigate(view: View): void {
   if (view.name === 'home')              window.location.hash = '';
+  else if (view.name === 'sertifikat')  window.location.hash = 'sertifikat';
   else if (view.name === 'pakta-admin') window.location.hash = 'pakta-admin';
   else if (view.name === 'pakta-signer') window.location.hash = `pakta/${view.eventId}`;
   else window.location.hash = `${view.name}/${view.eventId}`;

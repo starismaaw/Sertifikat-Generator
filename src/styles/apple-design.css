@@ -983,6 +983,91 @@ body {
   justify-content: center;
   flex-shrink: 0;
   margin-right: 12px;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  cursor: pointer;
+  transition: opacity 0.1s ease;
+}
+
+.sg-topbar-logo:hover {
+  opacity: 0.85;
+}
+
+.sg-topbar-logo:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* ── Hub (landing) ──────────────────────────────────────────── */
+
+.sg-hub {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 80px 24px;
+}
+
+.sg-hub-title {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: var(--color-ink);
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.sg-hub-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+@media (max-width: 600px) {
+  .sg-hub-grid { grid-template-columns: 1fr; }
+}
+
+.sg-hub-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-hairline);
+  border-radius: 16px;
+  padding: 48px 24px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, transform 0.1s ease;
+}
+
+.sg-hub-card:hover {
+  box-shadow: var(--shadow-elevated);
+}
+
+.sg-hub-card:active {
+  transform: scale(0.98);
+}
+
+.sg-hub-card:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.sg-hub-card-icon {
+  width: 88px;
+  height: 88px;
+  border-radius: 20px;
+  background: var(--color-canvas-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sg-hub-card-label {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-ink);
 }
 
 .sg-breadcrumb {

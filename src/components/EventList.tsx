@@ -109,12 +109,6 @@ export function EventList() {
               </button>
             </>
           )}
-          <button
-            className="sg-btn sg-btn-secondary sg-btn-pill"
-            onClick={() => navigate({ name: 'pakta-admin' })}
-          >
-            Pakta Integritas
-          </button>
         </div>
       </div>
 
