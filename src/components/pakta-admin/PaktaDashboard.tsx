@@ -5,6 +5,7 @@ import { usePaktaAdmin } from '../../contexts/PaktaAdminContext';
 import { ImportSignersModal } from './ImportSignersModal';
 import { matchesSignerQuery } from '../../lib/signerFilter';
 import { buildZip, downloadBlob } from '../../lib/download';
+import { isValidSlug } from '../../lib/slug';
 
 type BulkDownloadPhase = 'idle' | 'fetching' | 'zipping';
 const BULK_CONCURRENCY = 5;
@@ -24,7 +25,12 @@ interface EventDetail {
   nama: string;
   tanggal: string;
   status: 'aktif' | 'ditutup';
+  slug: string;
   pakta_signers: Signer[];
+}
+
+function buildPublicUrl(slug: string): string {
+  return `${window.location.origin}/#pakta/${slug}`;
 }
 
 export function PaktaDashboard({ eventId }: { eventId: string }) {
@@ -40,15 +46,17 @@ export function PaktaDashboard({ eventId }: { eventId: string }) {
   const [bulkDone, setBulkDone] = useState(0);
   const [bulkTotal, setBulkTotal] = useState(0);
   const [bulkCurrentName, setBulkCurrentName] = useState('');
-
-  const publicUrl = `${window.location.origin}/#pakta/${eventId}`;
+  const [editingSlug, setEditingSlug] = useState(false);
+  const [slugInput, setSlugInput] = useState('');
+  const [slugError, setSlugError] = useState('');
+  const [savingSlug, setSavingSlug] = useState(false);
 
   async function load() {
     setLoading(true);
     try {
       const { event: ev } = await callAdmin<{ event: EventDetail }>('get_event', { id: eventId });
       setEvent(ev);
-      const qr = await QRCode.toDataURL(publicUrl, { width: 200, margin: 1 });
+      const qr = await QRCode.toDataURL(buildPublicUrl(ev.slug), { width: 200, margin: 1 });
       setQrDataUrl(qr);
     } catch (err) {
       setError((err as Error).message);
@@ -86,7 +94,37 @@ export function PaktaDashboard({ eventId }: { eventId: string }) {
   }
 
   function copyLink() {
-    navigator.clipboard.writeText(publicUrl).catch(() => {});
+    if (!event) return;
+    navigator.clipboard.writeText(buildPublicUrl(event.slug)).catch(() => {});
+  }
+
+  function startEditSlug() {
+    if (!event) return;
+    setSlugInput(event.slug);
+    setSlugError('');
+    setEditingSlug(true);
+  }
+
+  async function saveSlug() {
+    if (!event) return;
+    const trimmed = slugInput.trim();
+    if (!isValidSlug(trimmed)) {
+      setSlugError('Slug harus huruf kecil, angka, dan tanda hubung saja (3-60 karakter)');
+      return;
+    }
+    setSavingSlug(true);
+    setSlugError('');
+    try {
+      await callAdmin('update_event', { id: eventId, slug: trimmed });
+      setEvent({ ...event, slug: trimmed });
+      const qr = await QRCode.toDataURL(buildPublicUrl(trimmed), { width: 200, margin: 1 });
+      setQrDataUrl(qr);
+      setEditingSlug(false);
+    } catch (err) {
+      setSlugError((err as Error).message);
+    } finally {
+      setSavingSlug(false);
+    }
   }
 
   if (error) return (
@@ -98,6 +136,7 @@ export function PaktaDashboard({ eventId }: { eventId: string }) {
 
   if (loading || !event) return <div style={{ padding: 40 }}><p className="apple-caption">Memuat…</p></div>;
 
+  const publicUrl = buildPublicUrl(event.slug);
   const signers = event.pakta_signers ?? [];
   const sudahCount = signers.filter(s => s.status === 'sudah').length;
   const totalCount = signers.length;
@@ -299,16 +338,59 @@ export function PaktaDashboard({ eventId }: { eventId: string }) {
             {qrDataUrl && (
               <img src={qrDataUrl} alt="QR Code link tanda tangan" style={{ width: 180, height: 180 }} />
             )}
-            <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 8, wordBreak: 'break-all' }}>
-              {publicUrl}
-            </div>
-            <button
-              className="sg-btn sg-btn-outline"
-              style={{ marginTop: 10, fontSize: 12, width: '100%' }}
-              onClick={copyLink}
-            >
-              Salin Link
-            </button>
+            {editingSlug ? (
+              <div style={{ marginTop: 8 }}>
+                <input
+                  type="text"
+                  className="apple-input"
+                  value={slugInput}
+                  onChange={(e) => setSlugInput(e.target.value)}
+                  style={{ width: '100%', fontSize: 12 }}
+                  disabled={savingSlug}
+                />
+                {slugError && (
+                  <p className="apple-error" style={{ fontSize: 11, marginTop: 6 }}>{slugError}</p>
+                )}
+                <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                  <button
+                    className="sg-btn sg-btn-primary"
+                    style={{ flex: 1, fontSize: 12 }}
+                    disabled={savingSlug}
+                    onClick={saveSlug}
+                  >
+                    {savingSlug ? 'Menyimpan…' : 'Simpan'}
+                  </button>
+                  <button
+                    className="sg-btn sg-btn-outline"
+                    style={{ flex: 1, fontSize: 12 }}
+                    disabled={savingSlug}
+                    onClick={() => setEditingSlug(false)}
+                  >
+                    Batal
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 8, wordBreak: 'break-all' }}>
+                  {publicUrl}
+                </div>
+                <button
+                  className="sg-btn sg-btn-outline"
+                  style={{ marginTop: 10, fontSize: 12, width: '100%' }}
+                  onClick={startEditSlug}
+                >
+                  Ubah
+                </button>
+                <button
+                  className="sg-btn sg-btn-outline"
+                  style={{ marginTop: 6, fontSize: 12, width: '100%' }}
+                  onClick={copyLink}
+                >
+                  Salin Link
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
