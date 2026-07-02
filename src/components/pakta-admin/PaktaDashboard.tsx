@@ -100,10 +100,10 @@ export function PaktaDashboard({ eventId }: { eventId: string }) {
   return (
     <div className="apple-page apple-page-wide">
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
         <button className="sg-btn sg-btn-outline" onClick={() => navigate({ name: 'pakta-admin' })}>← Kembali</button>
-        <div>
-          <h1 className="apple-h1" style={{ margin: 0 }}>{event.nama}</h1>
+        <div style={{ minWidth: 0 }}>
+          <h1 className="apple-h1" style={{ margin: 0, overflowWrap: 'break-word' }}>{event.nama}</h1>
           <span className="apple-caption">{event.tanggal}</span>
         </div>
       </div>
@@ -126,7 +126,7 @@ export function PaktaDashboard({ eventId }: { eventId: string }) {
           </div>
 
           {/* Tombol aksi */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
             <button className="sg-btn sg-btn-outline" onClick={() => setShowImport(true)}>
               Impor Pegawai
             </button>

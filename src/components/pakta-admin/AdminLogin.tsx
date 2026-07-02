@@ -31,7 +31,7 @@ export function AdminLogin() {
   return (
     <div className="apple-page apple-page-compact" style={{ maxWidth: 400, paddingTop: 80 }}>
       <div className="apple-card">
-        <div className="apple-card-header">
+        <div style={{ marginBottom: 'var(--apple-space-md)' }}>
           <h1 className="apple-h2">Admin Pakta Integritas</h1>
           <p className="apple-caption" style={{ marginTop: 4 }}>
             Masukkan sandi untuk mengakses dasbor admin.
