@@ -56,7 +56,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!nama || !tanggal) {
         return res.status(400).json({ error: 'nama dan tanggal wajib diisi' });
       }
-      const base = slugify(nama) || 'acara';
+      let base = slugify(nama);
+      if (base.length < 3) {
+        base = 'acara';
+      } else {
+        base = base.slice(0, 55).replace(/-+$/g, '');
+      }
       let candidate = base;
       let data: { id: string }[] | null = null;
       let error: { code?: string; message: string } | null = null;

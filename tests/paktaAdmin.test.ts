@@ -127,6 +127,30 @@ describe('pakta-admin handler', () => {
     expect(insertMock.mock.calls[0][0].slug).toBe('pakta-baru');
   });
 
+  // WHY: nama pendek seperti "K3" atau "PI" (singkatan umum di instansi pemerintah)
+  // tidak boleh menghasilkan slug di bawah 3 karakter — itu melanggar CHECK
+  // constraint di database dan membuat pembuatan acara gagal dengan error 500 yang membingungkan.
+  it('create_event memakai fallback "acara" untuk nama yang menghasilkan slug terlalu pendek', async () => {
+    const newEvent = { id: 'ev-new', nama: 'K3', slug: 'acara', status: 'aktif' };
+    const selectFn = vi.fn().mockResolvedValue({ data: [newEvent], error: null });
+    const insertMock = vi.fn().mockReturnValue({ select: selectFn });
+    fromAdminMock.mockReturnValue({ insert: insertMock });
+
+    const res = mockRes();
+    await handler(mockReq({
+      action: 'create_event',
+      nama: 'K3',
+      tanggal: '2026-07-01',
+      bg_width: 800,
+      bg_height: 600,
+      fields: [],
+    }), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(insertMock).toHaveBeenCalledTimes(1);
+    expect(insertMock.mock.calls[0][0].slug).toBe('acara');
+  });
+
   // WHY: dua acara dengan nama yang menghasilkan slug sama harus otomatis dapat akhiran -2, -3, dst — bukan gagal.
   it('create_event menambah akhiran -2 kalau slug dasar sudah dipakai', async () => {
     const selectFn = vi.fn()
