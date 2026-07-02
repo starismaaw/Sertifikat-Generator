@@ -6,20 +6,21 @@ const { instances } = vi.hoisted(() => ({ instances: [] as unknown as MockSignat
 interface MockSignaturePadInstance {
   canvas: HTMLCanvasElement;
   options: { backgroundColor?: string };
-  listeners: Record<string, () => void>;
+  listeners: Record<string, { cb: () => void; once: boolean }>;
   clear: ReturnType<typeof vi.fn>;
   off: ReturnType<typeof vi.fn>;
   isEmpty: ReturnType<typeof vi.fn>;
   toDataURL: ReturnType<typeof vi.fn>;
   toData: ReturnType<typeof vi.fn>;
   fromData: ReturnType<typeof vi.fn>;
+  dispatch: (event: string) => void;
 }
 
 vi.mock('signature_pad', () => {
   class MockSignaturePad implements MockSignaturePadInstance {
     canvas: HTMLCanvasElement;
     options: { backgroundColor?: string };
-    listeners: Record<string, () => void> = {};
+    listeners: Record<string, { cb: () => void; once: boolean }> = {};
     clear = vi.fn();
     off = vi.fn();
     isEmpty = vi.fn(() => true);
@@ -31,8 +32,14 @@ vi.mock('signature_pad', () => {
       this.options = options;
       instances.push(this);
     }
-    addEventListener(event: string, cb: () => void) {
-      this.listeners[event] = cb;
+    addEventListener(event: string, cb: () => void, options?: { once?: boolean }) {
+      this.listeners[event] = { cb, once: options?.once ?? false };
+    }
+    dispatch(event: string) {
+      const entry = this.listeners[event];
+      if (!entry) return;
+      entry.cb();
+      if (entry.once) delete this.listeners[event];
     }
   }
   return { default: MockSignaturePad };
@@ -68,7 +75,7 @@ describe('SignaturePad', () => {
   it('memanggil onStrokeBegin saat event beginStroke terjadi pada pad', () => {
     const onStrokeBegin = vi.fn();
     render(<SignaturePad onStrokeBegin={onStrokeBegin} />);
-    instances[0].listeners.beginStroke();
+    instances[0].dispatch('beginStroke');
     expect(onStrokeBegin).toHaveBeenCalledTimes(1);
   });
 
@@ -76,18 +83,23 @@ describe('SignaturePad', () => {
     const onStrokeBegin = vi.fn();
     render(<SignaturePad onStrokeBegin={onStrokeBegin} />);
     // Simulasi stroke pertama
-    instances[0].listeners.beginStroke();
+    instances[0].dispatch('beginStroke');
     expect(onStrokeBegin).toHaveBeenCalledTimes(1);
-    // Simulasi stroke kedua (misal setelah clear)
-    instances[0].listeners.beginStroke();
+    // Simulasi stroke kedua (misal setelah clear). Mock addEventListener menghormati
+    // opsi `once`, jadi tes ini akan gagal (hanya terpanggil 1x) jika kode sumber
+    // kembali memakai { once: true } saat mendaftarkan listener beginStroke.
+    instances[0].dispatch('beginStroke');
     expect(onStrokeBegin).toHaveBeenCalledTimes(2);
   });
 
   it('memanggil pad.clear() saat tombol "Hapus Tanda Tangan" diklik', () => {
     render(<SignaturePad />);
+    // resizeCanvas() dipanggil sekali saat mount, jadi clear() sudah terpanggil
+    // sebelum tombol diklik; pakai delta agar tes tidak bergantung pada jumlah
+    // panggilan clear() saat mount.
     const clearCountBefore = instances[0].clear.mock.calls.length;
     fireEvent.click(screen.getByRole('button', { name: 'Hapus Tanda Tangan' }));
     const clearCountAfter = instances[0].clear.mock.calls.length;
-    expect(clearCountAfter).toBeGreaterThan(clearCountBefore);
+    expect(clearCountAfter).toBe(clearCountBefore + 1);
   });
 });
