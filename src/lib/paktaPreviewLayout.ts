@@ -5,6 +5,12 @@ import { browserTextWidth, toCssFont } from './pdfRenderer';
  *  nyaman digambar dengan jari di layar sempit meski field aslinya kecil. */
 export const MIN_SIGNATURE_HEIGHT = 140;
 
+/** Lebar minimum (px, sudah di-scale), setara MIN_SIGNATURE_HEIGHT — area gambar
+ *  tetap nyaman dipakai jari walau field aslinya sempit. Independen dari tinggi
+ *  (lihat catatan di computeSignatureBox soal kenapa keduanya TIDAK boleh berbagi
+ *  satu faktor pembesaran). */
+export const MIN_SIGNATURE_WIDTH = 140;
+
 /** scale = lebar kontainer / lebar natural background. 1 bila belum bisa diukur. */
 export function computeScale(containerWidth: number, bgWidth: number): number {
   if (bgWidth <= 0 || containerWidth <= 0) return 1;
@@ -25,22 +31,34 @@ function clamp(value: number, min: number, max: number): number {
 /**
  * Kotak tanda tangan interaktif, hasil scale field 'tandaTangan'.
  *
- * Tinggi SELALU diusahakan mencapai MIN_SIGNATURE_HEIGHT (supaya nyaman digambar
- * dengan jari) — hanya dibatasi containerH bila dokumen itu sendiri lebih pendek
- * dari itu (kasus langka). Lebar dibesarkan proporsional mengikuti pertumbuhan
- * tinggi (mempertahankan rasio lebar:tinggi asli field bila memungkinkan), tapi
- * DIBATASI TERPISAH agar tidak pernah melebihi lebar dokumen (containerW).
+ * Lebar & tinggi masing-masing diusahakan mencapai minimumnya sendiri
+ * (MIN_SIGNATURE_WIDTH / MIN_SIGNATURE_HEIGHT) SECARA INDEPENDEN, lalu
+ * di-clamp terpisah ke containerW/containerH supaya tidak pernah melebihi
+ * batas dokumen. Keduanya SENGAJA tidak berbagi satu faktor pembesaran
+ * (growFactor) yang mempertahankan rasio lebar:tinggi asli field —
+ * pendekatan itu sudah dicoba dan menimbulkan dua bug bolak-balik:
  *
- * Catatan: tinggi & lebar dibatasi secara TERPISAH (bukan satu growFactor
- * bersama) supaya field TTD yang lebar-tapi-pendek (umum untuk area tanda
- * tangan bergaya garis) tidak membuat tinggi ikut terpepet kecil hanya karena
- * lebarnya kena batas dokumen di layar sempit — sebelumnya ini menyebabkan
- * kotak gambar jadi sangat cebol (mis. 105px, bukan 140px) di mobile, sehingga
- * tanda tangan yang digambar terlihat kecil/renggang saat di-stretch ke ukuran
- * field asli di PDF akhir. Trade-off: rasio kotak di layar bisa sedikit beda
- * dari field.lebar:tinggi saat lebar kena batas — dampaknya sekadar sedikit
- * peregangan proporsi coretan tanda tangan, jauh lebih dapat diterima daripada
- * area gambar yang terlalu sempit.
+ * 1. Kalau growFactor dihitung dari sisi tinggi lalu dipakai juga untuk
+ *    lebar (guna mempertahankan rasio), untuk field lebar-tapi-pendek (mis.
+ *    400x120) growFactor bisa sangat besar di layar sempit, sehingga lebar
+ *    hasil kali growFactor jadi rumus TANPA scale sama sekali
+ *    (rawWidth * (MIN_HEIGHT/rawHeight) = (field.lebar/field.tinggi) *
+ *    MIN_HEIGHT) — device-independent, dan setelah di-clamp ke containerW
+ *    kotak jadi selebar HAMPIR SELURUH dokumen di layar mobile, walau field
+ *    aslinya cuma sebagian kecil lebar dokumen (bug: "kotak TTD melebar
+ *    sangat jauh dari field template").
+ * 2. Kalau growFactor sebaliknya dibatasi/dipepetkan oleh batas lebar
+ *    (containerW), tinggi ikut kepepet kecil (mis. 105px, bukan 140px)
+ *    karena berbagi faktor yang sama dengan lebar.
+ *
+ * Dengan lebar & tinggi independen, kedua bug di atas tidak mungkin terjadi
+ * lagi: masing-masing dimensi hanya boleh membesar sampai minimumnya sendiri
+ * dan tidak pernah melebihi ukuran dokumen. Trade-off: rasio kotak di layar
+ * bisa berbeda dari field.lebar:tinggi saat salah satu dimensi field jauh
+ * lebih kecil dari minimumnya — dampaknya sekadar sedikit peregangan
+ * proporsi coretan tanda tangan saat di-stretch ke ukuran field asli di PDF,
+ * jauh lebih baik daripada kotak yang jauh lebih besar/kecil dari field
+ * aslinya.
  *
  * Posisi (left/top) tetap dipusatkan pada titik tengah kotak field aslinya,
  * lalu di-clamp agar tidak keluar dari batas dokumen (mis. field dekat pojok).
@@ -59,12 +77,8 @@ export function computeSignatureBox(
   const containerW = bgWidth * scale;
   const containerH = bgHeight * scale;
 
-  const targetHeight = Math.max(rawHeight, MIN_SIGNATURE_HEIGHT);
-  const height = Math.min(targetHeight, containerH);
-
-  const heightGrowFactor = rawHeight > 0 ? height / rawHeight : 1;
-  const proportionalWidth = rawWidth * heightGrowFactor;
-  const width = Math.min(proportionalWidth, containerW);
+  const width = Math.min(Math.max(rawWidth, MIN_SIGNATURE_WIDTH), containerW);
+  const height = Math.min(Math.max(rawHeight, MIN_SIGNATURE_HEIGHT), containerH);
 
   const centerX = rawLeft + rawWidth / 2;
   const centerY = rawTop + rawHeight / 2;

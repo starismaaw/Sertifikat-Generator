@@ -1,53 +1,47 @@
 ## Agent Handoff
 
-**Branch:** `claude/frosty-gauss-fb09bb`
-**Task:** Preview tanda tangan realistis untuk Pakta Integritas — dokumen penuh (background + field nama/NIP/jabatan terisi data asli) ditampilkan saat pegawai menandatangani, dengan kanvas TTD transparan tepat di posisi field `tandaTangan`, supaya terasa seperti menandatangani dokumen asli (bukan kartu ringkasan teks + kotak TTD terpisah seperti sebelumnya).
-**Last agent:** Claude Sonnet 5 (Claude Code), via context7 research → brainstorming → writing-plans → subagent-driven-development
-**Status:** SELESAI. Semua 7 task dari plan selesai, semua task review bersih (task 4 butuh 2 ronde fix — lihat di bawah). Manual browser verification oleh controller sendiri (lewat harness sementara + `preview_*` tools, tidak dikomit) menemukan dan memperbaiki 1 bug tambahan (lihat "Bug ditemukan lewat verifikasi manual"). Build ✅, test 136/136 ✅. **Belum di-push/PR/merge** — menunggu instruksi eksplisit user.
+**Branch:** `claude/sharp-chaum-8bf41f`
+**Task:** Dua bug laporan user di halaman signing Pakta Integritas versi mobile: (1) kotak tanda tangan melebar sangat jauh dari field template, (2) tombol overlay "Hapus Tanda Tangan" menutupi hasil preview tanda tangan.
+**Last agent:** Claude Sonnet 5 (Claude Code), via skill `systematic-debugging`
+**Status:** SELESAI. Root cause diinvestigasi & diperbaiki untuk kedua bug. Build ✅, test 139/139 ✅. Verifikasi visual manual di browser (mobile viewport 375px) via harness sementara (tidak dikomit — direvert dengan `git checkout` setelah verifikasi). **Belum di-push/PR/merge** — menunggu instruksi eksplisit user.
 
-### Referensi
-- Spec: `docs/superpowers/specs/2026-07-02-pakta-realistic-signing-preview-design.md`
-- Plan: `docs/superpowers/plans/2026-07-02-pakta-realistic-signing-preview.md`
-- Ledger progres SDD: `.superpowers/sdd/progress.md`
+### Root cause (bug 1 — kotak TTD melebar jauh dari field template)
+Ini adalah patch ke-5 berturut-turut di logic yang sama (`930cad9` → `0d93a71` → `6aea5f2` → `9c31d31` → `6dd2e6b`), masing-masing memperbaiki satu gejala tapi memunculkan gejala lain — pola klasik "growFactor bersama untuk lebar & tinggi" yang saling tarik-menarik. Root cause: `computeSignatureBox` (di `src/lib/paktaPreviewLayout.ts`) menghitung `heightGrowFactor` dari kebutuhan tinggi minimum (`MIN_SIGNATURE_HEIGHT=140px`), lalu memakai faktor yang SAMA untuk membesarkan lebar demi mempertahankan rasio field. Secara aljabar ini membuat lebar hasil = `(field.lebar/field.tinggi) * 140` — rumus yang **device/scale-independent**. Untuk field lebar-tapi-pendek (default field TTD: rasio 2.5:1, atau kasus ekstrem lain), setelah di-clamp ke `containerW`, kotak jadi selebar hampir SELURUH dokumen di layar mobile sempit, walau field aslinya cuma sebagian kecil lebar dokumen. Test lama (`tests/paktaPreviewLayout.test.ts`) bahkan sudah men-dokumentasikan perilaku ini sebagai "expected" (`width: 350` = persis lebar dokumen).
+
+**Fix:** Lebar & tinggi kotak sekarang dihitung SEPENUHNYA INDEPENDEN — masing-masing punya minimum sendiri (`MIN_SIGNATURE_WIDTH=140`, baru; `MIN_SIGNATURE_HEIGHT=140`, sudah ada) dan di-clamp terpisah ke `containerW`/`containerH`. Tidak ada lagi growFactor bersama. Ini juga menyederhanakan kode (menghapus `heightGrowFactor`/`proportionalWidth`).
+
+### Root cause (bug 2 — tombol Hapus Tanda Tangan menutupi preview)
+Tombol lama pakai class `apple-btn apple-btn-secondary apple-btn-sm` berisi teks penuh "Hapus Tanda Tangan", diposisikan absolute overlay di pojok kanan-bawah kotak TTD. Class `.apple-btn-sm` punya aturan `min-height: 44px` yang dipaksakan di bawah viewport 480px (aturan touch-target aksesibilitas Apple HIG), sehingga di mobile tombol jadi ±150px lebar × 44px tinggi — di kotak TTD yang (sebelum fix bug 1) sudah kecil, tombol ini menutupi sebagian besar area gambar tanda tangan.
+
+**Fix:** Ganti ke convention icon-only yang sudah ada di codebase (`sg-btn sg-btn-icon`, dipakai di `PaktaEditor.tsx`, `EventCard.tsx`, `PaktaEventList.tsx` — 34×34px, SVG `TrashIcon` lokal per-file, `aria-label`/`title` untuk aksesibilitas). Jauh lebih kecil, tidak lagi tertimpa aturan `min-height:44px` yang khusus untuk `.apple-btn-sm`.
 
 ### Ringkasan Perubahan
-- `tests/setup.ts` — polyfill `ResizeObserver` untuk jsdom (dibutuhkan `SignaturePad` & `PaktaDocumentPreview`).
-- `src/lib/pdfRenderer.ts` — `browserTextWidth` diekspor (sebelumnya private) supaya bisa dipakai ulang oleh preview browser, identik dengan pengukuran teks di PDF akhir.
-- `src/lib/paktaPreviewLayout.ts` (baru) — fungsi murni: `computeScale`, `computeSignatureBox` (dengan `MIN_SIGNATURE_HEIGHT = 140` — klem ukuran minimum kotak TTD di layar sempit, keputusan UX dari diskusi user soal ergonomi mobile), `fitFontSizeCss`.
-- `src/components/pakta-signer/SignaturePad.tsx` — mode "embedded": prop `transparent`, `hideClearButton`, `onStrokeBegin` (fire di SETIAP stroke baru, bukan cuma pertama kali — lihat catatan bug di bawah), `style`. Default tetap perilaku lama (dipakai standalone di path fallback).
-- `src/components/pakta-signer/PaktaDocumentPreview.tsx` (baru) — komponen inti: render `<img>` background + field terisi (posisi presisi via scale) + kotak TTD interaktif (SignaturePad transparan + hint dashed "Tanda tangan di sini" + tombol Hapus di pojok kotak). `formatter` field (uppercase) sengaja tidak diterapkan — parity dengan `pdfRenderer.ts` yang juga mengabaikannya untuk Pakta.
-- `src/components/pakta-signer/PaktaSignPage.tsx` — step `signing` diganti total: kartu ringkasan teks + kotak TTD terpisah → `PaktaDocumentPreview`. Fallback ke `SignaturePad` standalone bila template belum punya field `tandaTangan`. `handleSubmit` tidak diubah.
-
-### Bug ditemukan & diperbaiki selama proses
-1. **Task 4, ronde review 1→3:** `pad.addEventListener('beginStroke', ..., { once: true })` di draft awal berarti hint TTD cuma bisa hilang SEKALI seumur hidup komponen — setelah "Hapus Tanda Tangan" lalu menggambar ulang, hint tidak akan hilang lagi. Ditemukan reviewer, diperbaiki (hapus `{ once: true }`). Fix pertama lolos tapi test pembuktinya ternyata tidak benar-benar menguji perilaku (mock `signature_pad` mengabaikan opsi `once`) — reviewer menangkap ini juga, jadi ada ronde fix ke-2 yang membuat mock benar-benar menghormati semantik `once` (dibuktikan dengan sanity-check manual: reintroduce bug → test gagal, revert fix → test lolos).
-2. **Task 7, manual browser verification:** teks field panjang (mis. jabatan) pecah ke baris kedua di layar sempit alih-alih tetap satu baris dan mengecil — `fitFontSizeCss` menghitung ukuran font yang pas, tapi tanpa `white-space: nowrap` browser tetap bisa wrap karena selisih sub-pixel antara pengukuran canvas vs layout DOM. PDF akhir selalu satu baris, jadi ini pecah paritas visual. Diperbaiki: `white-space: nowrap` pada teks + `overflow: hidden` pada wrapper sebagai pengaman (commit `fc1ebbc`).
+- `src/lib/paktaPreviewLayout.ts` — `computeSignatureBox` disederhanakan: lebar & tinggi independen, tanpa growFactor bersama. `MIN_SIGNATURE_WIDTH=140` baru diekspor.
+- `tests/paktaPreviewLayout.test.ts` — nilai expected diupdate sesuai logic baru; 1 test lama yang men-dokumentasikan bug (`width:350`) diupdate; 1 test regresi baru khusus memastikan kotak tidak melebar jauh melebihi lebar asli field.
+- `src/components/pakta-signer/PaktaDocumentPreview.tsx` — tombol hapus TTD diganti dari `apple-btn-sm` teks penuh → `sg-btn sg-btn-icon` (34×34, ikon trash lokal).
 
 ### Verifikasi manual yang sudah dilakukan
-Karena tidak ada `.env` Supabase di worktree ini (hanya `.env.example`), verifikasi end-to-end dengan data Supabase asli TIDAK BISA dilakukan di sini. Sebagai gantinya, dilakukan verifikasi visual lewat harness sementara (`src/main.tsx` di-override sementara untuk me-render `PaktaDocumentPreview` langsung dengan data fixture, lalu dikembalikan via `git checkout` — tidak ada jejak di working tree) memakai `preview_*` tools:
-- ✅ Dokumen penuh dengan field jabatan/namaNip terisi tampil presisi.
-- ✅ Kotak TTD dengan hint dashed "Tanda tangan di sini" sebelum digambar.
-- ✅ Klem `MIN_SIGNATURE_HEIGHT` terbukti bekerja di browser sungguhan: viewport mobile 375px, field TTD kecil yang secara matematis akan jadi ±54px tinggi, tetap dijaga 140px persis (dikonfirmasi lewat `getBoundingClientRect()`).
-- ✅ Menggambar (via `PointerEvent` sintetis) → hint hilang, tombol "Hapus Tanda Tangan" muncul di pojok kotak.
-- ✅ Klik "Hapus Tanda Tangan" → kanvas kosong, hint muncul lagi.
-- ✅ Menggambar lagi setelah hapus → hint hilang lagi (membuktikan fix bug #1 bekerja end-to-end, bukan cuma di unit test).
+Harness sementara di `src/App.tsx` (route `?debugSigBox=1` merender `PaktaDocumentPreview` langsung dengan template fixture, background SVG data-URI) dipakai untuk verifikasi visual lewat `preview_*` tools di viewport mobile 375px, lalu DIREVERT (`git checkout -- src/App.tsx`) — tidak ada jejak di working tree:
+- ✅ Field TTD 400×120 (rasio lebar-pendek, sama seperti default field TTD di editor) pada dokumen 1000px lebar, container mobile 343px: kotak jadi **140×140px** (dikonfirmasi `getBoundingClientRect()`), BUKAN ±343px (hampir selebar dokumen) seperti sebelum fix.
+- ✅ Menggambar tanda tangan (via `PointerEvent` sintetis realistis dengan delay antar-event) → tombol hapus (ikon kecil pojok kanan-bawah) TIDAK menutupi coretan tanda tangan (dikonfirmasi screenshot).
+- ✅ Klik tombol hapus → kanvas kosong, hint "Tanda tangan di sini" muncul kembali.
 
-**Belum diverifikasi:** alur signing end-to-end dengan Supabase asli (pilih nama dari daftar, submit, upload PDF, download) — perlu `.env` terisi kredensial Supabase yang valid dan event/signer nyata di database. Juga belum diverifikasi visual di desktop width penuh dengan template asli (hanya diuji dengan template fixture buatan sendiri).
+**Belum diverifikasi:** alur signing end-to-end dengan Supabase asli (perlu `.env` kredensial valid + event/signer nyata) dan desktop viewport (perubahan ini menurut analisis matematis tidak berpengaruh di desktop, karena `rawHeight` biasanya sudah ≥ `MIN_SIGNATURE_HEIGHT` di container lebar — konsisten dengan laporan bug sebelumnya bahwa desktop "sudah benar").
 
 ### Commands Run
 ```
 npm install
 npm run build   # tsc -b && vite build — PASS
-npx vitest run  # 22 files, 136/136 tests — PASS
+npm run test    # 22 files, 139/139 tests — PASS
 ```
-**Catatan jujur:** tidak ada script `lint` di `package.json` (project-wide, bukan spesifik perubahan ini) — `npm run lint` yang disebut di finish protocol AGENTS.md tidak bisa dijalankan karena scriptnya tidak ada. Ini bukan sesuatu yang saya perbaiki (di luar scope fitur ini) — perlu keputusan user apakah mau ditambahkan.
+**Catatan jujur:** tidak ada script `lint` di `package.json` (pre-existing, di luar scope perubahan ini).
 
 ### Known Issues
-- Verifikasi Supabase end-to-end belum bisa dilakukan di worktree ini (lihat di atas) — sangat disarankan dites manual sekali lagi di environment dengan `.env` terisi sebelum merge ke `main`.
-- Tidak ada script `lint` di project (pre-existing, di luar scope).
-- Bundle JS utama >2MB setelah build (warning dari Vite, pre-existing, tidak terkait perubahan ini).
+- Tidak ada script `lint` di project (pre-existing).
+- Bundle JS utama >2MB setelah build (warning Vite, pre-existing, tidak terkait perubahan ini).
+- Verifikasi Supabase end-to-end belum bisa dilakukan di worktree ini — disarankan dites manual sekali lagi di environment dengan `.env` terisi sebelum merge ke `main`.
 
 ### Next Step
 1. User me-review perubahan (atau minta code review lewat `/code-review`).
-2. Task-per-task sudah dikomit oleh subagent selama eksekusi plan (lihat `git log` untuk daftar commit dari `6ae1ba9` sampai `fc1ebbc`), jadi working tree sudah bersih; tidak ada langkah commit tambahan yang tertunda untuk kode.
-3. Push branch & buat PR hanya setelah user eksplisit minta.
-4. Sebelum atau sesudah merge: uji manual sekali dengan Supabase environment nyata (pilih nama, tanda tangan, submit, download PDF) untuk menutup gap verifikasi di atas.
+2. Push branch & buat PR hanya setelah user eksplisit minta.
+3. Sebelum atau sesudah merge: uji manual sekali dengan Supabase environment nyata di HP sungguhan untuk menutup gap verifikasi di atas.
