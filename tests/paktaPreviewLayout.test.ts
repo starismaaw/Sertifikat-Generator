@@ -4,6 +4,7 @@ import {
   computeScale,
   computeSignatureBox,
   fitFontSizeCss,
+  measureFontAscent,
 } from '../src/lib/paktaPreviewLayout';
 
 describe('computeScale', () => {
@@ -50,6 +51,20 @@ describe('computeSignatureBox', () => {
   it('mengekspor MIN_SIGNATURE_HEIGHT = 140', () => {
     expect(MIN_SIGNATURE_HEIGHT).toBe(140);
   });
+
+  it('tidak membiarkan kotak melebar keluar dari dokumen saat growFactor besar di layar sempit (bug: field kecil di mobile)', () => {
+    // Simulasi nyata: template 2000x2500px, field TTD 400x120, dilihat di layar mobile
+    // (containerWidth ~350px -> scale=0.175). rawWidth=70, rawHeight=21 -> growFactor
+    // "ideal" untuk capai MIN_SIGNATURE_HEIGHT adalah 140/21=6.67, yang akan membuat
+    // width=466.67 -- lebih lebar dari containerW (350) itu sendiri. Lebar kotak harus
+    // dibatasi agar tidak pernah melebihi containerW/containerH, walau artinya tinggi
+    // akhir jadi kurang dari MIN_SIGNATURE_HEIGHT.
+    const field = { x: 1600, y: 2000, lebar: 400, tinggi: 120 };
+    const box = computeSignatureBox(field, 0.175, 2000, 2500);
+    expect(box.width).toBeLessThanOrEqual(2000 * 0.175);
+    expect(box.height).toBeLessThanOrEqual(2500 * 0.175);
+    expect(box).toEqual({ left: 0, top: 308, width: 350, height: 105 });
+  });
 });
 
 describe('fitFontSizeCss', () => {
@@ -72,5 +87,16 @@ describe('fitFontSizeCss', () => {
     const field = { fontFamily: 'Inter', fontWeight: 'Regular' as const, ukuran: 32, lebar: 1 };
     const size = fitFontSizeCss('Teks yang sangat sangat panjang sekali', field);
     expect(size).toBe(6);
+  });
+});
+
+describe('measureFontAscent', () => {
+  it('mengembalikan angka positif via fallback saat canvas 2d context tidak tersedia (lingkungan test)', () => {
+    // Di jsdom tidak ada canvas 2d context sungguhan, jadi harus jatuh ke fallback
+    // (bukan crash/NaN) — nilai pastinya diverifikasi manual di browser (lihat spec),
+    // tes ini hanya menjamin fungsi tidak pernah mengembalikan 0/NaN/negatif.
+    const ascent = measureFontAscent('Inter', 'Regular', 40);
+    expect(ascent).toBeGreaterThan(0);
+    expect(Number.isFinite(ascent)).toBe(true);
   });
 });
