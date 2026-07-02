@@ -40,7 +40,14 @@ export function AppTopbar({
 }) {
   return (
     <header className="sg-topbar">
-      <div className="sg-topbar-logo">S</div>
+      <button
+        type="button"
+        className="sg-topbar-logo"
+        onClick={() => navigate({ name: 'home' })}
+        aria-label="Beranda"
+      >
+        S
+      </button>
       <nav className="sg-breadcrumb" aria-label="Navigasi">
         {breadcrumbs.map((item, idx) => {
           const isLast = idx === breadcrumbs.length - 1;
