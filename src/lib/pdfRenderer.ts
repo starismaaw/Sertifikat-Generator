@@ -204,9 +204,12 @@ export async function renderPakta(
       if (!sigImage) continue;
       const h = field.tinggi ?? field.lebar / 2;
       // Scale seragam (contain-fit, bukan stretch-fill) supaya tanda tangan tidak
-      // melar/gepeng saat rasio kotak gambar interaktif (mis. persegi di mobile,
-      // lihat computeSignatureBox di paktaPreviewLayout.ts) berbeda dari rasio
-      // field asli. Lihat docs/superpowers/specs/2026-07-02-pakta-signature-natural-fit-design.md.
+      // melar/gepeng. Sejak computeSignatureBox (paktaPreviewLayout.ts) membuat kotak
+      // gambar interaktif selalu sama rasio dengan field asli, scaleToFit di sini pada
+      // praktiknya jadi no-op (w/hh = field.lebar/h persis) -- tetap dipertahankan
+      // sebagai lapisan pertahanan kalau rasio kotak & field pernah berbeda lagi.
+      // Lihat docs/superpowers/specs/2026-07-02-pakta-signature-natural-fit-design.md
+      // dan .../2026-07-02-pakta-signature-box-match-field-design.md.
       const { width: w, height: hh } = sigImage.scaleToFit(field.lebar, h);
       // field.y = TOP kotak; konversi ke origin bawah pdf-lib. Gambar dipusatkan
       // di dalam kotak field pada sumbu yang tidak jadi faktor pembatas scale.
