@@ -37,7 +37,7 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(fu
       backgroundColor: transparent ? 'rgba(255,255,255,0)' : '#fff',
     });
     padRef.current = pad;
-    pad.addEventListener('beginStroke', () => onStrokeBeginRef.current?.(), { once: true });
+    pad.addEventListener('beginStroke', () => onStrokeBeginRef.current?.());
 
     function resizeCanvas() {
       if (!canvas || !padRef.current) return;

@@ -72,6 +72,17 @@ describe('SignaturePad', () => {
     expect(onStrokeBegin).toHaveBeenCalledTimes(1);
   });
 
+  it('memanggil onStrokeBegin setiap kali stroke baru dimulai, bukan hanya saat pertama kali', () => {
+    const onStrokeBegin = vi.fn();
+    render(<SignaturePad onStrokeBegin={onStrokeBegin} />);
+    // Simulasi stroke pertama
+    instances[0].listeners.beginStroke();
+    expect(onStrokeBegin).toHaveBeenCalledTimes(1);
+    // Simulasi stroke kedua (misal setelah clear)
+    instances[0].listeners.beginStroke();
+    expect(onStrokeBegin).toHaveBeenCalledTimes(2);
+  });
+
   it('memanggil pad.clear() saat tombol "Hapus Tanda Tangan" diklik', () => {
     render(<SignaturePad />);
     const clearCountBefore = instances[0].clear.mock.calls.length;
