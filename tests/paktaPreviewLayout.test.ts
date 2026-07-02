@@ -1,7 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import {
-  MIN_SIGNATURE_HEIGHT,
-  MIN_SIGNATURE_WIDTH,
   computeScale,
   computeSignatureBox,
   fitFontSizeCss,
@@ -20,67 +18,36 @@ describe('computeScale', () => {
 });
 
 describe('computeSignatureBox', () => {
-  it('tidak mengubah kotak bila tinggi hasil scale sudah >= MIN_SIGNATURE_HEIGHT', () => {
-    const field = { x: 100, y: 100, lebar: 400, tinggi: 150 };
-    const box = computeSignatureBox(field, 1, 1000, 1000);
-    expect(box).toEqual({ left: 100, top: 100, width: 400, height: 150 });
-  });
-
-  it('membesarkan lebar & tinggi secara independen & terpusat saat keduanya lebih kecil dari minimumnya, tanpa perlu clamp', () => {
-    // rawWidth=100 -> width=MIN_SIGNATURE_WIDTH=140 (independen dari tinggi)
-    // rawHeight=50 -> height=MIN_SIGNATURE_HEIGHT=140
-    // pusat asli: x=400+50=450, y=400+25=425 -> box baru terpusat di titik itu
-    const field = { x: 400, y: 400, lebar: 100, tinggi: 50 };
-    const box = computeSignatureBox(field, 1, 1000, 1000);
-    expect(box).toEqual({ left: 380, top: 355, width: 140, height: 140 });
-  });
-
-  it('meng-clamp kotak yang membesar agar tidak keluar dari batas dokumen (mis. field dekat pojok kiri-atas)', () => {
-    // rawWidth=100 -> width=140, rawHeight=50 -> height=140
-    // pusat asli (60,35) membuat box keluar batas kiri/atas -> di-clamp ke 0
-    const field = { x: 10, y: 10, lebar: 100, tinggi: 50 };
-    const box = computeSignatureBox(field, 1, 1000, 1000);
-    expect(box).toEqual({ left: 0, top: 0, width: 140, height: 140 });
+  it('mengembalikan kotak persis ukuran field * scale, tanpa pembesaran apapun', () => {
+    const field = { x: 100, y: 50, lebar: 400, tinggi: 150 };
+    const box = computeSignatureBox(field, 0.5, 2000, 1500);
+    expect(box).toEqual({ left: 50, top: 25, width: 200, height: 75 });
   });
 
   it('memakai lebar/2 sebagai tinggi default bila field.tinggi tidak diisi', () => {
     const field = { x: 0, y: 0, lebar: 300, tinggi: undefined };
     const box = computeSignatureBox(field, 1, 1000, 1000);
-    // rawHeight = 300/2 = 150 >= MIN_SIGNATURE_HEIGHT -> tidak membesar
     expect(box).toEqual({ left: 0, top: 0, width: 300, height: 150 });
   });
 
-  it('mengekspor MIN_SIGNATURE_HEIGHT = 140 dan MIN_SIGNATURE_WIDTH = 140', () => {
-    expect(MIN_SIGNATURE_HEIGHT).toBe(140);
-    expect(MIN_SIGNATURE_WIDTH).toBe(140);
-  });
-
-  it('tidak membiarkan kotak melebar keluar dari dokumen saat field kecil di layar sempit (mobile)', () => {
-    // Simulasi nyata: template 2000x2500px, field TTD 400x120, dilihat di layar mobile
-    // (containerWidth ~350px -> scale=0.175). rawWidth=70, rawHeight=21 -- keduanya di
-    // bawah minimum masing-masing, jadi width->MIN_SIGNATURE_WIDTH(140),
-    // height->MIN_SIGNATURE_HEIGHT(140), independen satu sama lain.
+  it('TIDAK membesarkan kotak sama sekali walau field & scale kecil (trade-off yang disetujui: tidak ada lagi minimum kenyamanan sentuh)', () => {
+    // Field & scale yang sama seperti kasus historis "field TTD kecil di mobile" --
+    // versi lama fungsi ini akan membesarkan box ini ke 140x140 (minimum). Sekarang
+    // box HARUS tetap kecil (70x21), persis field*scale, tanpa pembesaran apapun --
+    // ini adalah bukti eksplisit dari trade-off yang disetujui: field TTD yang
+    // didesain kecil di editor akan menghasilkan kotak gambar yang kecil juga di
+    // layar sempit.
     const field = { x: 1600, y: 2000, lebar: 400, tinggi: 120 };
     const box = computeSignatureBox(field, 0.175, 2000, 2500);
-    expect(box.width).toBeLessThanOrEqual(2000 * 0.175);
-    expect(box.height).toBeLessThanOrEqual(2500 * 0.175);
-    expect(box).toEqual({ left: 210, top: 290.5, width: 140, height: 140 });
+    expect(box).toEqual({ left: 280, top: 350, width: 70, height: 21 });
   });
 
-  it('tidak melebarkan kotak jauh melebihi lebar asli field hanya karena tingginya perlu dibesarkan (bug: kotak TTD melebar jauh dari field template di mobile)', () => {
-    // Field lebar-tapi-pendek (rasio 400:120 = 3.33:1), khas area TTD bergaya garis.
-    // Sebelumnya, growFactor dari sisi tinggi (MIN_HEIGHT/rawHeight) ikut dipakai untuk
-    // lebar demi mempertahankan rasio, menghasilkan lebar = (field.lebar/field.tinggi) *
-    // MIN_HEIGHT -- rumus yang device-independent, lalu clamp ke containerW membuat
-    // kotak selebar HAMPIR SELURUH dokumen di layar sempit walau field aslinya cuma
-    // 20% lebar dokumen. Sekarang lebar hanya boleh membesar sampai MIN_SIGNATURE_WIDTH
-    // sendiri (140px), jauh lebih dekat ke lebar asli field di layar (70px).
-    const field = { x: 1600, y: 2000, lebar: 400, tinggi: 120 };
-    const scale = 0.175;
-    const box = computeSignatureBox(field, scale, 2000, 2500);
-    const containerW = 2000 * scale; // 350
-    expect(box.width).toBeLessThan(containerW * 0.5); // jauh di bawah lebar dokumen
-    expect(box.width).toBe(MIN_SIGNATURE_WIDTH);
+  it('tidak meng-clamp ke batas dokumen (bgWidth/bgHeight sudah tidak dipakai sama sekali)', () => {
+    // Field yang (secara kontrived) melebihi batas dokumen -- membuktikan tidak ada
+    // lagi logic clamp tersembunyi yang bergantung pada bgWidth/bgHeight.
+    const field = { x: 900, y: 900, lebar: 200, tinggi: 200 };
+    const box = computeSignatureBox(field, 1, 1000, 1000);
+    expect(box).toEqual({ left: 900, top: 900, width: 200, height: 200 });
   });
 });
 
