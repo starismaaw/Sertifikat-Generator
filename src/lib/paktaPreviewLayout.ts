@@ -1,16 +1,6 @@
 import type { Field } from '../types';
 import { browserTextWidth, toCssFont } from './pdfRenderer';
 
-/** Tinggi minimum (px, sudah di-scale) kotak tanda tangan interaktif, supaya tetap
- *  nyaman digambar dengan jari di layar sempit meski field aslinya kecil. */
-export const MIN_SIGNATURE_HEIGHT = 140;
-
-/** Lebar minimum (px, sudah di-scale), setara MIN_SIGNATURE_HEIGHT — area gambar
- *  tetap nyaman dipakai jari walau field aslinya sempit. Independen dari tinggi
- *  (lihat catatan di computeSignatureBox soal kenapa keduanya TIDAK boleh berbagi
- *  satu faktor pembesaran). */
-export const MIN_SIGNATURE_WIDTH = 140;
-
 /** scale = lebar kontainer / lebar natural background. 1 bila belum bisa diukur. */
 export function computeScale(containerWidth: number, bgWidth: number): number {
   if (bgWidth <= 0 || containerWidth <= 0) return 1;
@@ -24,69 +14,36 @@ export interface SignatureBox {
   height: number;
 }
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max);
-}
-
 /**
- * Kotak tanda tangan interaktif, hasil scale field 'tandaTangan'.
+ * Kotak tanda tangan interaktif, hasil scale field 'tandaTangan' APA ADANYA
+ * -- tanpa pembesaran/minimum apapun. Rasio & ukuran kotak SELALU sama
+ * persis dengan field asli (cuma discale), di SEMUA device (mobile,
+ * tablet, desktop) -- sama seperti field teks lain, tidak diperlakukan
+ * istimewa. Ini SENGAJA: minimum kenyamanan sentuh yang pernah ada di sini
+ * (lihat riwayat git) justru jadi akar penyebab dua bug berikutnya (kotak
+ * melebar keluar dokumen, lalu tanda tangan hasil PDF menyusut lebih kecil
+ * dari field karena scaleToFit menyusutkan sisi yang rasionya tidak cocok
+ * lagi dengan field) -- root cause sebenarnya, bukan solusinya. Trade-off
+ * yang diterima: field TTD yang didesain kecil di editor akan menghasilkan
+ * kotak gambar yang kecil juga di layar sempit, tanpa proteksi otomatis.
  *
- * Lebar & tinggi masing-masing diusahakan mencapai minimumnya sendiri
- * (MIN_SIGNATURE_WIDTH / MIN_SIGNATURE_HEIGHT) SECARA INDEPENDEN, lalu
- * di-clamp terpisah ke containerW/containerH supaya tidak pernah melebihi
- * batas dokumen. Keduanya SENGAJA tidak berbagi satu faktor pembesaran
- * (growFactor) yang mempertahankan rasio lebar:tinggi asli field —
- * pendekatan itu sudah dicoba dan menimbulkan dua bug bolak-balik:
- *
- * 1. Kalau growFactor dihitung dari sisi tinggi lalu dipakai juga untuk
- *    lebar (guna mempertahankan rasio), untuk field lebar-tapi-pendek (mis.
- *    400x120) growFactor bisa sangat besar di layar sempit, sehingga lebar
- *    hasil kali growFactor jadi rumus TANPA scale sama sekali
- *    (rawWidth * (MIN_HEIGHT/rawHeight) = (field.lebar/field.tinggi) *
- *    MIN_HEIGHT) — device-independent, dan setelah di-clamp ke containerW
- *    kotak jadi selebar HAMPIR SELURUH dokumen di layar mobile, walau field
- *    aslinya cuma sebagian kecil lebar dokumen (bug: "kotak TTD melebar
- *    sangat jauh dari field template").
- * 2. Kalau growFactor sebaliknya dibatasi/dipepetkan oleh batas lebar
- *    (containerW), tinggi ikut kepepet kecil (mis. 105px, bukan 140px)
- *    karena berbagi faktor yang sama dengan lebar.
- *
- * Dengan lebar & tinggi independen, kedua bug di atas tidak mungkin terjadi
- * lagi: masing-masing dimensi hanya boleh membesar sampai minimumnya sendiri
- * dan tidak pernah melebihi ukuran dokumen. Trade-off: rasio kotak di layar
- * bisa berbeda dari field.lebar:tinggi saat salah satu dimensi field jauh
- * lebih kecil dari minimumnya — dampaknya sekadar sedikit peregangan
- * proporsi coretan tanda tangan saat di-stretch ke ukuran field asli di PDF,
- * jauh lebih baik daripada kotak yang jauh lebih besar/kecil dari field
- * aslinya.
- *
- * Posisi (left/top) tetap dipusatkan pada titik tengah kotak field aslinya,
- * lalu di-clamp agar tidak keluar dari batas dokumen (mis. field dekat pojok).
+ * `_bgWidth`/`_bgHeight` sengaja dipertahankan di signature (diawali `_`
+ * supaya lolos `noUnusedParameters`) walau tidak dipakai lagi di badan
+ * fungsi -- supaya pemanggil (`PaktaDocumentPreview.tsx`) tidak perlu
+ * diubah.
  */
 export function computeSignatureBox(
   field: Pick<Field, 'x' | 'y' | 'lebar' | 'tinggi'>,
   scale: number,
-  bgWidth: number,
-  bgHeight: number,
+  _bgWidth: number,
+  _bgHeight: number,
 ): SignatureBox {
-  const rawWidth = field.lebar * scale;
-  const rawHeight = (field.tinggi ?? field.lebar / 2) * scale;
-  const rawLeft = field.x * scale;
-  const rawTop = field.y * scale;
-
-  const containerW = bgWidth * scale;
-  const containerH = bgHeight * scale;
-
-  const width = Math.min(Math.max(rawWidth, MIN_SIGNATURE_WIDTH), containerW);
-  const height = Math.min(Math.max(rawHeight, MIN_SIGNATURE_HEIGHT), containerH);
-
-  const centerX = rawLeft + rawWidth / 2;
-  const centerY = rawTop + rawHeight / 2;
-
-  const left = clamp(centerX - width / 2, 0, Math.max(0, containerW - width));
-  const top = clamp(centerY - height / 2, 0, Math.max(0, containerH - height));
-
-  return { left, top, width, height };
+  return {
+    left: field.x * scale,
+    top: field.y * scale,
+    width: field.lebar * scale,
+    height: (field.tinggi ?? field.lebar / 2) * scale,
+  };
 }
 
 /**
