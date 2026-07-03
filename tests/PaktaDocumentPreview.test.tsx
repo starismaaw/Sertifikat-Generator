@@ -75,10 +75,10 @@ describe('PaktaDocumentPreview', () => {
     expect(screen.queryByText('Tanda tangan di sini')).not.toBeInTheDocument();
   });
 
-  it('menampilkan tombol "Hapus Tanda Tangan" hanya setelah ada tanda tangan', () => {
+  it('tidak menampilkan tombol hapus di dalam area pratinjau (dikelola parent)', () => {
     render(<PaktaDocumentPreview template={template} values={values} />);
     expect(screen.queryByRole('button', { name: 'Hapus Tanda Tangan' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId('mock-signature-pad'));
-    expect(screen.getByRole('button', { name: 'Hapus Tanda Tangan' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Hapus Tanda Tangan' })).not.toBeInTheDocument();
   });
 });

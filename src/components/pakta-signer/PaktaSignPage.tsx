@@ -288,7 +288,7 @@ export function PaktaSignPage({ slug }: { slug: string }) {
               <p style={{ color: 'var(--color-ink-faint)', fontSize: 12, marginBottom: 12 }}>
                 Template ini belum memiliki area tanda tangan yang ditentukan. Gambar tanda tangan Anda di kotak berikut.
               </p>
-              <SignaturePad ref={sigPadRef} />
+              <SignaturePad ref={sigPadRef} hideClearButton />
             </div>
           )}
 
@@ -298,6 +298,15 @@ export function PaktaSignPage({ slug }: { slug: string }) {
             onClick={handleSubmit}
           >
             Kirim Tanda Tangan
+          </button>
+
+          <button
+            type="button"
+            className="apple-btn apple-btn-danger"
+            style={{ width: '100%', marginTop: 12 }}
+            onClick={() => sigPadRef.current?.clear()}
+          >
+            Hapus Tanda Tangan
           </button>
         </div>
       </div>
