@@ -51,6 +51,7 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(fu
     const pad = new SignaturePadLib(canvas, {
       minWidth: BASE_MIN_WIDTH * strokeScale,
       maxWidth: BASE_MAX_WIDTH * strokeScale,
+      minDistance: 1,
       backgroundColor: transparent ? 'rgba(255,255,255,0)' : '#fff',
     });
     padRef.current = pad;
