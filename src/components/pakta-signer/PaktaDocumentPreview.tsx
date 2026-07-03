@@ -168,6 +168,7 @@ export const PaktaDocumentPreview = forwardRef<SignaturePadHandle, PaktaDocument
               transparent
               hideClearButton
               onStrokeBegin={() => setHasSignature(true)}
+              strokeScale={scale}
             />
             {!hasSignature && (
               <span

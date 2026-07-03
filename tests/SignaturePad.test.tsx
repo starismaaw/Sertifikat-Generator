@@ -5,7 +5,9 @@ const { instances } = vi.hoisted(() => ({ instances: [] as unknown as MockSignat
 
 interface MockSignaturePadInstance {
   canvas: HTMLCanvasElement;
-  options: { backgroundColor?: string };
+  options: { backgroundColor?: string; minWidth?: number; maxWidth?: number };
+  minWidth: number;
+  maxWidth: number;
   listeners: Record<string, { cb: () => void; once: boolean }>;
   clear: ReturnType<typeof vi.fn>;
   off: ReturnType<typeof vi.fn>;
@@ -19,7 +21,9 @@ interface MockSignaturePadInstance {
 vi.mock('signature_pad', () => {
   class MockSignaturePad implements MockSignaturePadInstance {
     canvas: HTMLCanvasElement;
-    options: { backgroundColor?: string };
+    options: { backgroundColor?: string; minWidth?: number; maxWidth?: number };
+    minWidth: number;
+    maxWidth: number;
     listeners: Record<string, { cb: () => void; once: boolean }> = {};
     clear = vi.fn();
     off = vi.fn();
@@ -27,9 +31,11 @@ vi.mock('signature_pad', () => {
     toDataURL = vi.fn(() => 'data:image/png;base64,mock');
     toData = vi.fn(() => []);
     fromData = vi.fn();
-    constructor(canvas: HTMLCanvasElement, options: { backgroundColor?: string }) {
+    constructor(canvas: HTMLCanvasElement, options: { backgroundColor?: string; minWidth?: number; maxWidth?: number }) {
       this.canvas = canvas;
       this.options = options;
+      this.minWidth = options.minWidth ?? 0;
+      this.maxWidth = options.maxWidth ?? 0;
       instances.push(this);
     }
     addEventListener(event: string, cb: () => void, options?: { once?: boolean }) {
@@ -70,6 +76,27 @@ describe('SignaturePad', () => {
   it('memakai backgroundColor putih saat transparent tidak diisi', () => {
     render(<SignaturePad />);
     expect(instances[0].options.backgroundColor).toBe('#fff');
+  });
+
+  it('memakai minWidth=1, maxWidth=3 sebagai default saat strokeScale tidak diisi', () => {
+    render(<SignaturePad />);
+    expect(instances[0].options.minWidth).toBe(1);
+    expect(instances[0].options.maxWidth).toBe(3);
+  });
+
+  it('mengalikan minWidth/maxWidth dengan strokeScale saat diisi', () => {
+    render(<SignaturePad strokeScale={0.3} />);
+    expect(instances[0].options.minWidth).toBe(0.3);
+    expect(instances[0].options.maxWidth).toBeCloseTo(0.9);
+  });
+
+  it('memutasi minWidth/maxWidth pada instance yang sama saat strokeScale berubah, tanpa membuat instance baru', () => {
+    const { rerender } = render(<SignaturePad strokeScale={1} />);
+    expect(instances.length).toBe(1);
+    rerender(<SignaturePad strokeScale={0.5} />);
+    expect(instances.length).toBe(1);
+    expect(instances[0].minWidth).toBe(0.5);
+    expect(instances[0].maxWidth).toBeCloseTo(1.5);
   });
 
   it('memanggil onStrokeBegin saat event beginStroke terjadi pada pad', () => {

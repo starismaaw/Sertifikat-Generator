@@ -7,6 +7,15 @@ export interface SignaturePadHandle {
   clear: () => void;
 }
 
+/** Target lebar goresan FINAL (satuan dokumen/PDF-point), independen dari device/scale.
+ *  Sama seperti minWidth/maxWidth statis yang dipakai sebelum ada strokeScale -- supaya
+ *  tampilan saat strokeScale=1 (default, mode standalone) tidak berubah sama sekali.
+ *  Dikalikan `strokeScale` (scale layar-ke-dokumen dari PaktaDocumentPreview) supaya lebar
+ *  goresan yang di-embed ke PDF (dibagi scale yang sama saat scaleToFit) selalu konsisten
+ *  ke target ini di semua device -- lihat docs/superpowers/specs/2026-07-03-pakta-signature-stroke-width-scaling-design.md. */
+const BASE_MIN_WIDTH = 1;
+const BASE_MAX_WIDTH = 3;
+
 export interface SignaturePadProps {
   /** Kanvas transparan tanpa border putih, untuk menyatu di atas gambar dokumen. */
   transparent?: boolean;
@@ -16,10 +25,18 @@ export interface SignaturePadProps {
   onStrokeBegin?: () => void;
   /** Style tambahan untuk elemen <canvas>. */
   style?: CSSProperties;
+  /** Faktor scale layar-ke-dokumen (dari computeScale di PaktaDocumentPreview) -- lebar
+   *  goresan (minWidth/maxWidth) dikalikan nilai ini supaya lebar goresan FINAL setelah
+   *  di-embed ke PDF (yang membagi balik dengan scale yang sama lewat scaleToFit) tetap
+   *  konsisten di semua device, tidak makin tebal di kotak kecil (mobile). Default 1
+   *  (tidak ada kompensasi) -- dipakai di mode standalone (PaktaSignPage.tsx, saat
+   *  template belum punya field tandaTangan) yang tidak pernah di-embed lewat field
+   *  manapun, jadi tidak ada faktor scale untuk dikompensasi. */
+  strokeScale?: number;
 }
 
 export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(function SignaturePad(
-  { transparent = false, hideClearButton = false, onStrokeBegin, style },
+  { transparent = false, hideClearButton = false, onStrokeBegin, style, strokeScale = 1 },
   ref,
 ) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -32,8 +49,8 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(fu
     if (!canvas) return;
 
     const pad = new SignaturePadLib(canvas, {
-      minWidth: 1,
-      maxWidth: 3,
+      minWidth: BASE_MIN_WIDTH * strokeScale,
+      maxWidth: BASE_MAX_WIDTH * strokeScale,
       backgroundColor: transparent ? 'rgba(255,255,255,0)' : '#fff',
     });
     padRef.current = pad;
@@ -58,10 +75,22 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(fu
       observer.disconnect();
       pad.off();
     };
-    // onStrokeBegin sengaja tidak masuk deps: dibaca lewat ref supaya pad tidak
-    // dibuat ulang (dan tanda tangan yang sudah digambar tidak hilang) tiap render.
+    // onStrokeBegin & strokeScale sengaja tidak masuk deps: pad tidak boleh dibuat ulang
+    // (dan tanda tangan yang sudah digambar tidak hilang) tiap render -- onStrokeBegin
+    // dibaca lewat ref, strokeScale diterapkan lewat efek terpisah di bawah (memutasi
+    // properti pad langsung, bukan re-create instance).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transparent]);
+
+  // Terapkan strokeScale ke pad yang SUDAH ada (mutasi properti minWidth/maxWidth
+  // langsung -- signature_pad mendukung ini tanpa perlu re-create instance), supaya
+  // perubahan scale (mis. resize kontainer) tidak menghapus goresan yang sedang digambar.
+  useEffect(() => {
+    const pad = padRef.current;
+    if (!pad) return;
+    pad.minWidth = BASE_MIN_WIDTH * strokeScale;
+    pad.maxWidth = BASE_MAX_WIDTH * strokeScale;
+  }, [strokeScale]);
 
   useImperativeHandle(ref, () => ({
     isEmpty: () => padRef.current?.isEmpty() ?? true,

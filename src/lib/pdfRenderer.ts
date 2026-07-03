@@ -208,8 +208,15 @@ export async function renderPakta(
       // gambar interaktif selalu sama rasio dengan field asli, scaleToFit di sini pada
       // praktiknya jadi no-op (w/hh = field.lebar/h persis) -- tetap dipertahankan
       // sebagai lapisan pertahanan kalau rasio kotak & field pernah berbeda lagi.
-      // Lihat docs/superpowers/specs/2026-07-02-pakta-signature-natural-fit-design.md
-      // dan .../2026-07-02-pakta-signature-box-match-field-design.md.
+      // PENTING: faktor pembesaran uniform scaleToFit di sini (field.lebar dibagi lebar
+      // piksel gambar tangkapan) adalah kebalikan tepat dari `scale` yang dipakai
+      // SignaturePad.strokeScale (SignaturePad.tsx) untuk mengecilkan minWidth/maxWidth
+      // sebelum digambar -- keduanya saling meniadakan supaya lebar goresan FINAL di PDF
+      // konsisten di semua device. JANGAN hapus/ubah scaleToFit di sini tanpa juga
+      // meninjau ulang strokeScale, walau baris ini terlihat seperti no-op.
+      // Lihat docs/superpowers/specs/2026-07-02-pakta-signature-natural-fit-design.md,
+      // .../2026-07-02-pakta-signature-box-match-field-design.md, dan
+      // .../2026-07-03-pakta-signature-stroke-width-scaling-design.md.
       const { width: w, height: hh } = sigImage.scaleToFit(field.lebar, h);
       // field.y = TOP kotak; konversi ke origin bawah pdf-lib. Gambar dipusatkan
       // di dalam kotak field pada sumbu yang tidak jadi faktor pembatas scale.
