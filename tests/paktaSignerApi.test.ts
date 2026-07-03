@@ -109,12 +109,11 @@ describe('pakta-signer handler', () => {
         }),
       });
 
-    storageMock.from.mockReturnValue({
-      createSignedUploadUrl: vi.fn().mockResolvedValue({
-        data: { signedUrl: 'https://storage.supabase.co/upload?token=xyz' },
-        error: null,
-      }),
+    const createSignedUploadUrlMock = vi.fn().mockResolvedValue({
+      data: { signedUrl: 'https://storage.supabase.co/upload?token=xyz' },
+      error: null,
     });
+    storageMock.from.mockReturnValue({ createSignedUploadUrl: createSignedUploadUrlMock });
     createClientMock.mockReturnValue({ from: fromMock, storage: storageMock });
 
     const res = mockRes();
@@ -122,5 +121,9 @@ describe('pakta-signer handler', () => {
     expect(res.statusCode).toBe(200);
     expect(res.body.signedUrl).toContain('token=xyz');
     expect(res.body.pdfPath).toBe('ev1/s1.pdf');
+    // WHY: tanpa upsert:true, retry setelah upload sebelumnya terputus (tab
+    // tertutup sebelum updateSignerDone tersimpan) akan gagal permanen dengan
+    // "The resource already exists" walau status signer masih 'belum'.
+    expect(createSignedUploadUrlMock).toHaveBeenCalledWith('ev1/s1.pdf', { upsert: true });
   });
 });
