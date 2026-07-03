@@ -49,11 +49,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(403).json({ error: 'Acara sudah ditutup atau tidak ditemukan' });
       }
 
-      // Generate signed upload URL
+      // Generate signed upload URL.
+      // upsert: true — retry setelah upload sebelumnya terputus (tab tertutup,
+      // koneksi hilang) sebelum updateSignerDone() sempat jalan akan menyisakan
+      // file lama di path ini walau status di DB masih 'belum'. Tanpa upsert,
+      // Storage menolak dengan "The resource already exists" dan signer terkunci
+      // permanen. Status DB (dicek di atas) tetap satu-satunya sumber kebenaran
+      // untuk "sudah TTD", jadi overwrite di sini aman.
       const pdfPath = `${eventId}/${signerId}.pdf`;
       const { data, error: urlErr } = await sb.storage
         .from('pakta-documents')
-        .createSignedUploadUrl(pdfPath);
+        .createSignedUploadUrl(pdfPath, { upsert: true });
 
       if (urlErr || !data) {
         return res.status(500).json({ error: urlErr?.message ?? 'Gagal membuat URL unggah' });
