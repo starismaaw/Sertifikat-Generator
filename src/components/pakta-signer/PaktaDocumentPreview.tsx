@@ -4,14 +4,6 @@ import { WEIGHT_CSS } from '../../lib/fontRegistry';
 import { computeScale, computeSignatureBox, fitFontSizeCss, measureFontAscent } from '../../lib/paktaPreviewLayout';
 import { SignaturePad, type SignaturePadHandle } from './SignaturePad';
 
-function TrashIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-      <path d="M2 3.5h10M5.5 3.5V2h3v1.5M5 3.5l.5 8M9 3.5l-.5 8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 /**
  * Satu baris teks field, dirender sebagai SVG <text> diposisikan lewat baseline
  * (bukan <div>/<span> HTML biasa). Ini penting: CSS line-height/kotak baris TIDAK
@@ -185,26 +177,6 @@ export const PaktaDocumentPreview = forwardRef<SignaturePadHandle, PaktaDocument
               >
                 Tanda tangan di sini
               </span>
-            )}
-            {hasSignature && (
-              <button
-                type="button"
-                className="sg-btn sg-btn-icon"
-                title="Hapus Tanda Tangan"
-                aria-label="Hapus Tanda Tangan"
-                style={{
-                  position: 'absolute',
-                  right: 4,
-                  bottom: 4,
-                  background: 'rgba(255,255,255,0.85)',
-                }}
-                onClick={() => {
-                  innerSigRef.current?.clear();
-                  setHasSignature(false);
-                }}
-              >
-                <TrashIcon />
-              </button>
             )}
           </div>
         )}
