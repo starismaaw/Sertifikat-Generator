@@ -3,7 +3,6 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf
 export interface PaktaListRow {
   nama: string;
   nip: string;
-  jabatan: string;
   status: string;
   waktuTtd: string;
 }
@@ -14,9 +13,8 @@ const MARGIN = 40;
 const ROW_HEIGHT = 16;
 
 const COLS = [
-  { label: 'Nama', width: 180 },
+  { label: 'Nama', width: 400 },
   { label: 'NIP', width: 110 },
-  { label: 'Jabatan', width: 220 },
   { label: 'Status', width: 70 },
   { label: 'Waktu TTD', width: 140 },
 ] as const;
@@ -70,7 +68,7 @@ export async function buildPaktaListPdf(
       y -= ROW_HEIGHT;
     }
     let x = MARGIN;
-    const values = [row.nama, row.nip, row.jabatan, row.status, row.waktuTtd];
+    const values = [row.nama, row.nip, row.status, row.waktuTtd];
     values.forEach((val, i) => {
       page.drawText(val, { x, y, size: 9, font });
       x += COLS[i].width;

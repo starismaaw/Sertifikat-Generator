@@ -35,7 +35,6 @@ function makeRows(n: number): PaktaListRow[] {
   return Array.from({ length: n }, (_, i) => ({
     nama: `Pegawai ${i + 1}`,
     nip: `NIP${i + 1}`,
-    jabatan: 'Staf',
     status: i % 2 === 0 ? 'Sudah' : 'Belum',
     waktuTtd: i % 2 === 0 ? '01/01/2026 10.00.00' : '—',
   }));
@@ -51,13 +50,13 @@ describe('buildPaktaListPdf', () => {
     expect(Math.round(page.getHeight())).toBe(595);
   });
 
-  it('menggambar header (judul+tanggal+ringkasan+5 kolom) dan satu baris teks per kolom per baris data', async () => {
+  it('menggambar header (judul+tanggal+ringkasan+4 kolom) dan satu baris teks per kolom per baris data', async () => {
     const bytes = await buildPaktaListPdf('Pakta Integritas 2026', '01 Januari 2026', 1, 2, makeRows(2));
     const doc = await PDFDocument.load(bytes);
     const content = await pageContentText(doc, 0);
-    // header: judul + tanggal + ringkasan + 5 label kolom = 8 Tj
-    // 2 baris data x 5 kolom = 10 Tj
-    expect(countTokens(content, 'Tj')).toBe(18);
+    // header: judul + tanggal + ringkasan + 4 label kolom (Nama, NIP, Status, Waktu TTD) = 7 Tj
+    // 2 baris data x 4 kolom = 8 Tj
+    expect(countTokens(content, 'Tj')).toBe(15);
   });
 
   it('membuat halaman baru (page break) kalau baris melebihi satu halaman', async () => {
@@ -70,8 +69,8 @@ describe('buildPaktaListPdf', () => {
     const bytes = await buildPaktaListPdf('Pakta Integritas 2026', '01 Januari 2026', 20, 40, makeRows(40));
     const doc = await PDFDocument.load(bytes);
     const contentPage2 = await pageContentText(doc, 1);
-    // minimal 5 Tj untuk label kolom yang diulang di halaman baru
-    expect(countTokens(contentPage2, 'Tj')).toBeGreaterThanOrEqual(5);
+    // minimal 4 Tj untuk label kolom yang diulang di halaman baru
+    expect(countTokens(contentPage2, 'Tj')).toBeGreaterThanOrEqual(4);
   });
 
   it('bytes yang dihasilkan tidak kosong', async () => {
