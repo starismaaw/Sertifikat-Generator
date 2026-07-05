@@ -16,7 +16,10 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # 22+ dibutuhkan: @supabase/supabase-js v2 selalu membuat RealtimeClient
+          # yang butuh native WebSocket (baru stabil di Node 22), meski script ini
+          # tidak memakai fitur realtime sama sekali — lihat error di CI run pertama.
+          node-version: '22'
 
       - name: Install dependencies
         run: npm ci
