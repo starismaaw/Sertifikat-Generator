@@ -3,7 +3,7 @@ import QRCode from 'qrcode';
 import { navigate } from '../AppRouter';
 import { usePaktaAdmin } from '../../contexts/PaktaAdminContext';
 import { ImportSignersModal } from './ImportSignersModal';
-import { matchesSignerQuery } from '../../lib/signerFilter';
+import { filterSigners, type StatusFilter } from '../../lib/signerFilter';
 import { buildZip, downloadBlob } from '../../lib/download';
 import { isValidSlug } from '../../lib/slug';
 
@@ -42,6 +42,7 @@ export function PaktaDashboard({ eventId }: { eventId: string }) {
   const [showImport, setShowImport] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('semua');
   const [bulkPhase, setBulkPhase] = useState<BulkDownloadPhase>('idle');
   const [bulkDone, setBulkDone] = useState(0);
   const [bulkTotal, setBulkTotal] = useState(0);
@@ -140,9 +141,7 @@ export function PaktaDashboard({ eventId }: { eventId: string }) {
   const signers = event.pakta_signers ?? [];
   const sudahCount = signers.filter(s => s.status === 'sudah').length;
   const totalCount = signers.length;
-  const filteredSigners = signers.filter(s =>
-    matchesSignerQuery(s.nama, query) || matchesSignerQuery(s.nip, query)
-  );
+  const filteredSigners = filterSigners(signers, statusFilter, query);
 
   async function downloadAllPdfs() {
     if (!event) return;
@@ -263,6 +262,19 @@ export function PaktaDashboard({ eventId }: { eventId: string }) {
             <p className="apple-empty">Belum ada pegawai. Klik "Impor Pegawai" untuk menambahkan.</p>
           ) : (
             <>
+              <div className="sg-segmented" style={{ marginBottom: 12 }}>
+                {(['semua', 'sudah', 'belum'] as const).map(f => (
+                  <button
+                    key={f}
+                    type="button"
+                    className={`sg-segmented-btn ${statusFilter === f ? 'active' : ''}`}
+                    aria-pressed={statusFilter === f}
+                    onClick={() => setStatusFilter(f)}
+                  >
+                    {f === 'semua' ? 'Semua' : f === 'sudah' ? 'Sudah' : 'Belum'}
+                  </button>
+                ))}
+              </div>
               <input
                 type="text"
                 className="apple-input"
@@ -272,7 +284,11 @@ export function PaktaDashboard({ eventId }: { eventId: string }) {
                 style={{ width: '100%', marginBottom: 12 }}
               />
               {filteredSigners.length === 0 ? (
-                <p className="apple-empty">Tidak ada peserta yang cocok dengan pencarian.</p>
+                <p className="apple-empty">
+                  {query.trim() === ''
+                    ? 'Tidak ada peserta dengan status ini.'
+                    : 'Tidak ada peserta yang cocok dengan pencarian.'}
+                </p>
               ) : (
                 <div className="apple-table-wrap">
                   <table className="apple-table">
