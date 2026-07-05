@@ -4,7 +4,8 @@ import { navigate } from '../AppRouter';
 import { usePaktaAdmin } from '../../contexts/PaktaAdminContext';
 import { ImportSignersModal } from './ImportSignersModal';
 import { filterSigners, type StatusFilter } from '../../lib/signerFilter';
-import { buildZip, downloadBlob } from '../../lib/download';
+import { buildXlsx, buildZip, downloadBlob } from '../../lib/download';
+import { buildPaktaListPdf } from '../../lib/paktaListPdf';
 import { isValidSlug } from '../../lib/slug';
 
 type BulkDownloadPhase = 'idle' | 'fetching' | 'zipping';
@@ -196,6 +197,36 @@ export function PaktaDashboard({ eventId }: { eventId: string }) {
     }
   }
 
+  function exportExcel() {
+    if (!event) return;
+    const rows = filteredSigners.map(s => ({
+      Nama: s.nama,
+      NIP: s.nip,
+      Jabatan: s.jabatan,
+      Status: s.status === 'sudah' ? 'Sudah' : 'Belum',
+      'Waktu TTD': s.signed_at ? new Date(s.signed_at).toLocaleString('id-ID') : '',
+    }));
+    const bytes = buildXlsx(rows, 'Pakta');
+    downloadBlob(
+      bytes,
+      `Pakta - ${event.nama}.xlsx`,
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+  }
+
+  async function exportPdf() {
+    if (!event) return;
+    const rows = filteredSigners.map(s => ({
+      nama: s.nama,
+      nip: s.nip,
+      jabatan: s.jabatan,
+      status: s.status === 'sudah' ? 'Sudah' : 'Belum',
+      waktuTtd: s.signed_at ? new Date(s.signed_at).toLocaleString('id-ID') : '—',
+    }));
+    const bytes = await buildPaktaListPdf(event.nama, event.tanggal, sudahCount, totalCount, rows);
+    downloadBlob(bytes, `Pakta - ${event.nama}.pdf`, 'application/pdf');
+  }
+
   return (
     <div className="apple-page apple-page-wide">
       {/* Header */}
@@ -238,6 +269,20 @@ export function PaktaDashboard({ eventId }: { eventId: string }) {
               onClick={downloadAllPdfs}
             >
               {bulkPhase === 'idle' ? 'Unduh Semua (ZIP)' : '…'}
+            </button>
+            <button
+              className="sg-btn sg-btn-outline"
+              disabled={filteredSigners.length === 0}
+              onClick={exportExcel}
+            >
+              Unduh Excel
+            </button>
+            <button
+              className="sg-btn sg-btn-outline"
+              disabled={filteredSigners.length === 0}
+              onClick={exportPdf}
+            >
+              Unduh PDF
             </button>
           </div>
 
