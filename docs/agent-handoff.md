@@ -1,42 +1,47 @@
 ## Agent Handoff
 
-**Branch:** `claude/sharp-jennings-88f6ac`
-**Task:** Bug report: sebagian user dapat error "the resource already exist" (HTTP 500) di `/api/pakta-signer` walau belum pernah TTD dan masih ada di grup "belum menandatangani".
-**Last agent:** Claude Sonnet 5 (Claude Code), via skill `systematic-debugging`
-**Status:** SELESAI (root cause fixed + regression test). Build ✅, test 141/141 ✅. Tidak ada script `lint` di project (pre-existing). **Belum di-commit/push** — menunggu instruksi eksplisit user.
+**Branch:** `claude/confident-moser-e15a4d`
+**Task:** Tambah filter status (Semua/Sudah/Belum) + export Excel/PDF di dashboard admin Pakta Integritas (`PaktaDashboard.tsx`), mengikuti brainstorming → spec → plan → subagent-driven implementation.
+**Last agent:** Claude Sonnet 5 (Claude Code), via skill `subagent-driven-development` (5 task, tiap task implementer+reviewer subagent terpisah)
+**Status:** SELESAI (5/5 task implementasi disetujui reviewer). Build ✅, test 155/155 ✅. **Belum di-commit lebih lanjut/push** — semua commit sudah ada di branch ini secara lokal, menunggu review manusia + final whole-branch code review sebelum PR.
 
-### Root Cause
+### Spec & Plan
+- `docs/superpowers/specs/2026-07-05-pakta-dashboard-filter-export-design.md`
+- `docs/superpowers/plans/2026-07-05-pakta-dashboard-filter-export.md`
 
-`get_pdf_upload_url` di `api/pakta-signer.ts` memanggil `createSignedUploadUrl(pdfPath)` dengan path deterministik `${eventId}/${signerId}.pdf`, TANPA `upsert: true` (default Supabase Storage = `false`).
-
-Alur signing (`PaktaSignPage.tsx`): (1) minta signed upload URL → (2) render PDF di client → (3) PUT PDF ke signed URL → (4) baru setelah itu `updateSignerDone()` menandai status DB jadi `'sudah'`.
-
-Kalau proses terputus SETELAH langkah 3 (upload storage sukses) tapi SEBELUM langkah 4 selesai — tab ditutup, koneksi hilang, HP terkunci — signer tetap `status = 'belum'` di DB (makanya tampil di grup "belum menandatangani"), tapi file PDF sudah permanen ada di storage pada path itu. Percobaan TTD berikutnya memanggil `createSignedUploadUrl` dengan path yang SAMA, Storage menolak dengan "The resource already exists", endpoint meneruskannya sebagai 500. Signer terkunci permanen sampai fix ini.
-
-### Fix
-
-Satu perubahan: `createSignedUploadUrl(pdfPath, { upsert: true })`. Status DB (dicek tepat di atas pemanggilan ini, baris ~34-39) tetap satu-satunya sumber kebenaran untuk "sudah TTD" (request ditolak 409 kalau `status === 'sudah'`), jadi mengizinkan overwrite object storage yang basi/orphan aman — tidak membuka celah untuk menandatangani ulang dokumen yang sudah selesai.
-
-Self-healing: user yang sudah terlanjur stuck TIDAK perlu perbaikan data manual di Supabase — percobaan TTD berikutnya (setelah fix di-deploy) akan langsung berhasil overwrite file lama dan `updateSignerDone` akan jalan normal.
-
-### Files Changed
-- `api/pakta-signer.ts` — tambah `{ upsert: true }` pada `createSignedUploadUrl` (+ komentar WHY).
-- `tests/paktaSignerApi.test.ts` — assert `createSignedUploadUrl` dipanggil dengan `{ upsert: true }`. Diverifikasi test ini FAIL kalau fix di-revert (bukan false positive).
+### Files Changed (5 commit di branch ini, setelah `d129698` yang berisi spec doc)
+- `src/lib/signerFilter.ts` — tambah `filterSigners()` + `StatusFilter` type (commit `c684b72`)
+- `tests/signerFilter.test.ts` — 6 test baru untuk `filterSigners`
+- `src/components/pakta-admin/PaktaDashboard.tsx` — segmented control filter status (commit `f8f33f1`), lalu tombol "Unduh Excel"/"Unduh PDF" + `exportExcel`/`exportPdf` (commit `bb8cfe3`)
+- `src/lib/download.ts` — tambah `buildXlsx()` (commit `1f5ee00`)
+- `tests/download.test.ts` — baru, 3 test untuk `buildXlsx`
+- `src/lib/paktaListPdf.ts` — baru, `buildPaktaListPdf()` untuk PDF rekap tabel A4 landscape (commit `f8c2621`)
+- `tests/paktaListPdf.test.ts` — baru, 5 test untuk `buildPaktaListPdf`
 
 ### Commands Run
 ```
-npm install
-npm run build   # tsc -b && vite build — PASS
-npm run test    # 22 file, 141/141 test — PASS
-npm run lint    # tidak ada script lint (pre-existing)
+npm run build   # tsc -b && vite build — PASS (bundle >2MB warning, pre-existing)
+npm run test    # vitest run — 155/155 PASS, 24 file
+npm run lint    # tidak ada script lint di project (pre-existing)
 ```
 
-### Known Issues
-- `api/pakta-admin.ts` action `get_template_upload_url` (baris ~214-222) punya bentuk kode yang mirip (`createSignedUploadUrl` tanpa `upsert`), TIDAK disentuh — di luar scope laporan bug ini (jalur admin upload template, bukan jalur signer). Perlu ditinjau terpisah kalau ada laporan serupa di sisi admin.
-- Tidak ada script `lint` di project (pre-existing).
-- Bundle JS utama >2MB setelah build (warning Vite, pre-existing, tidak terkait perubahan ini).
+### Validation
+- Build: ✅
+- Lint: tidak ada script (pre-existing, bukan gap dari task ini)
+- Test: ✅ 155/155 (naik dari 141 sebelum task ini: +6 filterSigners, +3 buildXlsx, +5 buildPaktaListPdf, +... lihat riwayat commit sebelumnya untuk baseline)
+- Setiap task (1-5) sudah lolos review subagent terpisah (spec compliance ✅ + code quality Approved) sebelum lanjut ke task berikutnya — lihat `.superpowers/sdd/progress.md` (git-ignored, lokal) untuk ledger lengkap.
+
+### Known Issues / Catatan
+- **Manual browser QA dengan data signer nyata TIDAK bisa dilakukan di sandbox ini** — tidak ada `.env`/`.env.local` (hanya `.env.example`), jadi tidak ada kredensial Supabase maupun `PAKTA_ADMIN_PASSWORD` untuk login ke dashboard admin Pakta. Yang SUDAH diverifikasi di browser (dev server `vite`):
+  - Aplikasi boot bersih, tanpa error console, dari Hub → pilih modul "Pakta Integritas" → sampai layar login admin.
+  - Semua file baru/diubah (`signerFilter.ts`, `download.ts`, `paktaListPdf.ts`, `PaktaDashboard.tsx`) berhasil dimuat browser via Vite module graph (200 OK, tidak ada error transform/import).
+  - Submit password salah di layar login tidak menyebabkan crash/error console (tidak bisa diverifikasi lebih jauh tanpa backend nyata).
+  - Pembacaan ulang `PaktaDashboard.tsx` hasil akhir (setelah 5 task tergabung) dilakukan manual — struktur JSX koheren, tidak ada deklarasi ganda/sisa artefak dari proses multi-task.
+  - **Belum diverifikasi dengan mata sendiri**: interaksi klik filter Semua/Sudah/Belum dengan data nyata, isi file .xlsx/.pdf hasil unduhan, page-break PDF pada event dengan banyak peserta. Ini butuh environment dengan kredensial Supabase + event Pakta yang sudah ada datanya — silakan user coba manual di staging/production sebelum merge, mengikuti checklist di bagian 7 spec doc.
+- Reviewer Task 4 mencatat gap minor (bukan bug): `paktaListPdf.ts` belum ada test eksplisit untuk kasus 0 baris data dan hitungan halaman persis di titik overflow tepat 1 baris; juga posisi X footer nomor halaman pakai offset tetap (belum menyesuaikan lebar teks "Halaman X / Y" untuk halaman 2 digit). Tidak mempengaruhi kebenaran fungsional pada kasus umum, hanya polish/cakupan test.
+- Tidak ada script `lint` di project (pre-existing, sudah dicatat di handoff-handoff sebelumnya juga).
 
 ### Next Step
-1. User review perubahan (`api/pakta-signer.ts` + test).
-2. Commit & push hanya setelah user eksplisit minta.
-3. Setelah deploy: minta user yang sebelumnya kena bug ini coba TTD ulang — seharusnya langsung berhasil tanpa intervensi data manual.
+1. **User uji manual di lingkungan dengan Supabase nyata** (staging atau local dengan `.env` terisi): buka dashboard event Pakta dengan campuran signer sudah/belum, coba filter, coba "Unduh Excel"/"Unduh PDF", cek isi file, cek page-break PDF untuk event besar (>30 peserta). Checklist lengkap ada di bagian 7 spec doc.
+2. Setelah user konfirmasi manual QA di atas oke, jalankan **final whole-branch code review** (subagent code-reviewer atas seluruh diff `d129698..bb8cfe3` dari branch ini) sebelum PR — belum dijalankan di sesi ini.
+3. Commit/push hanya setelah user eksplisit minta (belum diminta sampai titik ini; semua commit masih lokal di branch `claude/confident-moser-e15a4d`).
