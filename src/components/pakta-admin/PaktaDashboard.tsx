@@ -219,7 +219,6 @@ export function PaktaDashboard({ eventId }: { eventId: string }) {
     const rows = filteredSigners.map(s => ({
       nama: s.nama,
       nip: s.nip,
-      jabatan: s.jabatan,
       status: s.status === 'sudah' ? 'Sudah' : 'Belum',
       waktuTtd: s.signed_at ? new Date(s.signed_at).toLocaleString('id-ID') : '—',
     }));
