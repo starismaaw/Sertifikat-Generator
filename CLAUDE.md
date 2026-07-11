@@ -1,4 +1,4 @@
-# Workflow Orchestration — Portal JDIH Balai P3KP Jawa III
+# Workflow Orchestration
 
 These rules apply to every task in this project unless explicitly overridden.
 Bias: caution over speed on non-trivial work. Use judgment on trivial tasks.
