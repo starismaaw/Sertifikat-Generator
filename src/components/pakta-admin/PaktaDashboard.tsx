@@ -7,6 +7,8 @@ import { filterSigners, type StatusFilter } from '../../lib/signerFilter';
 import { buildXlsx, buildZip, downloadBlob } from '../../lib/download';
 import { buildPaktaListPdf } from '../../lib/paktaListPdf';
 import { isValidSlug } from '../../lib/slug';
+import { useToast } from '../../contexts/ToastContext';
+import { SkeletonDashboard } from '../Skeleton';
 
 type BulkDownloadPhase = 'idle' | 'fetching' | 'zipping';
 const BULK_CONCURRENCY = 5;
@@ -36,6 +38,7 @@ function buildPublicUrl(slug: string): string {
 
 export function PaktaDashboard({ eventId }: { eventId: string }) {
   const { callAdmin } = usePaktaAdmin();
+  const { addToast } = useToast();
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -52,6 +55,7 @@ export function PaktaDashboard({ eventId }: { eventId: string }) {
   const [slugInput, setSlugInput] = useState('');
   const [slugError, setSlugError] = useState('');
   const [savingSlug, setSavingSlug] = useState(false);
+  const [resetTarget, setResetTarget] = useState<Signer | null>(null);
 
   async function load() {
     setLoading(true);
@@ -79,19 +83,25 @@ export function PaktaDashboard({ eventId }: { eventId: string }) {
       a.download = `pakta-${signer.nama.replace(/\s+/g, '_')}.pdf`;
       a.click();
     } catch (err) {
-      alert((err as Error).message);
+      addToast((err as Error).message, 'error');
     } finally {
       setDownloadingId(null);
     }
   }
 
   async function resetSigner(signer: Signer) {
-    if (!confirm(`Reset tanda tangan ${signer.nama}? PDF yang sudah ditandatangani akan dihapus permanen dan pegawai ini bisa TTD ulang.`)) return;
+    setResetTarget(signer);
+  }
+
+  async function confirmReset() {
+    if (!resetTarget) return;
     try {
-      await callAdmin('reset_signer', { id: signer.id });
+      await callAdmin('reset_signer', { id: resetTarget.id });
+      setResetTarget(null);
+      addToast(`Tanda tangan ${resetTarget.nama} berhasil direset.`, 'success');
       load();
     } catch (err) {
-      alert((err as Error).message);
+      addToast((err as Error).message, 'error');
     }
   }
 
@@ -136,7 +146,14 @@ export function PaktaDashboard({ eventId }: { eventId: string }) {
     </div>
   );
 
-  if (loading || !event) return <div style={{ padding: 40 }}><p className="apple-caption">Memuat…</p></div>;
+  if (loading || !event) return (
+    <div className="apple-page apple-page-wide">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+        <button className="sg-btn sg-btn-outline" onClick={() => navigate({ name: 'pakta-admin' })}>← Kembali</button>
+      </div>
+      <SkeletonDashboard />
+    </div>
+  );
 
   const publicUrl = buildPublicUrl(event.slug);
   const signers = event.pakta_signers ?? [];
@@ -188,7 +205,7 @@ export function PaktaDashboard({ eventId }: { eventId: string }) {
 
       downloadBlob(zip, `Pakta - ${event.nama}.zip`, 'application/zip');
     } catch (err) {
-      alert((err as Error).message);
+      addToast((err as Error).message, 'error');
     } finally {
       setBulkPhase('idle');
       setBulkDone(0);
@@ -460,6 +477,26 @@ export function PaktaDashboard({ eventId }: { eventId: string }) {
           eventId={eventId}
           onClose={() => { setShowImport(false); load(); }}
         />
+      )}
+
+      {resetTarget && (
+        <div className="sg-overlay" onClick={() => setResetTarget(null)}>
+          <div className="sg-modal sg-modal-sm" onClick={e => e.stopPropagation()}>
+            <div className="sg-modal-header">
+              <h2 className="sg-modal-title">Reset Tanda Tangan</h2>
+            </div>
+            <div className="sg-modal-body" style={{ textAlign: 'center' }}>
+              <p style={{ color: 'var(--color-ink-secondary)', lineHeight: 1.55 }}>
+                Reset tanda tangan <strong>{resetTarget.nama}</strong>?<br />
+                PDF yang sudah ditandatangani akan dihapus permanen dan pegawai ini bisa TTD ulang.
+              </p>
+            </div>
+            <div className="sg-modal-footer">
+              <button className="sg-btn sg-btn-outline" onClick={() => setResetTarget(null)}>Batal</button>
+              <button className="sg-btn sg-btn-danger-solid" onClick={confirmReset}>Reset</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

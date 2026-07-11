@@ -13,6 +13,8 @@ import { PaktaEventList } from './components/pakta-admin/PaktaEventList';
 import { PaktaEditor } from './components/pakta-admin/PaktaEditor';
 import { PaktaDashboard } from './components/pakta-admin/PaktaDashboard';
 import { PaktaSignPage } from './components/pakta-signer/PaktaSignPage';
+import { ToastProvider } from './contexts/ToastContext';
+import { ToastContainer } from './components/ToastContainer';
 
 function PaktaAdminRoot() {
   const { isLoggedIn } = usePaktaAdmin();
@@ -67,18 +69,21 @@ export default function App() {
   })();
 
   return (
-    <PaktaAdminProvider>
-      <div className="apple-app">
-        <AppTopbar
-          breadcrumbs={breadcrumbs}
-          saveState={view.name === 'editor' ? saveState : 'synced'}
-        />
-        {isPaktaView && <PaktaAdminRoot />}
-        {!isPaktaView && view.name === 'home' && <Hub />}
-        {!isPaktaView && view.name === 'sertifikat' && <EventList />}
-        {!isPaktaView && view.name === 'editor' && <CertificateEditor key={view.eventId} eventId={view.eventId} />}
-        {!isPaktaView && view.name === 'generate' && <GenerateView key={view.eventId} eventId={view.eventId} />}
-      </div>
-    </PaktaAdminProvider>
+    <ToastProvider>
+      <PaktaAdminProvider>
+        <div className="apple-app">
+          <AppTopbar
+            breadcrumbs={breadcrumbs}
+            saveState={view.name === 'editor' ? saveState : 'synced'}
+          />
+          {isPaktaView && <PaktaAdminRoot />}
+          {!isPaktaView && view.name === 'home' && <Hub />}
+          {!isPaktaView && view.name === 'sertifikat' && <EventList />}
+          {!isPaktaView && view.name === 'editor' && <CertificateEditor key={view.eventId} eventId={view.eventId} />}
+          {!isPaktaView && view.name === 'generate' && <GenerateView key={view.eventId} eventId={view.eventId} />}
+        </div>
+      </PaktaAdminProvider>
+      <ToastContainer />
+    </ToastProvider>
   );
 }

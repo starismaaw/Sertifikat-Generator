@@ -4,6 +4,8 @@ import { navigate } from '../AppRouter';
 import { NewPaktaEventModal } from './NewPaktaEventModal';
 import { ImportSignersModal } from './ImportSignersModal';
 import { DeleteConfirmModal } from '../DeleteConfirmModal';
+import { SkeletonBlock } from '../Skeleton';
+import { useToast } from '../../contexts/ToastContext';
 
 interface PaktaEvent {
   id: string;
@@ -37,6 +39,7 @@ function PaktaCard({
   onDelete: (event: PaktaEvent) => void;
 }) {
   const { callAdmin } = usePaktaAdmin();
+  const { addToast } = useToast();
   const [showImport, setShowImport] = useState(false);
 
   async function toggleStatus() {
@@ -45,7 +48,7 @@ function PaktaCard({
       await callAdmin('update_event', { id: event.id, status: next });
       onReload();
     } catch (err) {
-      alert((err as Error).message);
+      addToast((err as Error).message, 'error');
     }
   }
 
@@ -107,6 +110,7 @@ function PaktaCard({
 
 export function PaktaEventList() {
   const { callAdmin, logout } = usePaktaAdmin();
+  const { addToast } = useToast();
   const [events, setEvents] = useState<PaktaEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -140,7 +144,7 @@ export function PaktaEventList() {
       setDeleteTarget(null);
       load();
     } catch (err) {
-      alert((err as Error).message);
+      addToast((err as Error).message, 'error');
     } finally {
       setDeleting(false);
     }
@@ -159,7 +163,13 @@ export function PaktaEventList() {
       </div>
 
       {error && <p className="apple-error" style={{ marginBottom: 16 }}>{error}</p>}
-      {loading && <p className="apple-caption">Memuat…</p>}
+      {loading && (
+        <div style={{ opacity: 0.5, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <SkeletonBlock height={72} />
+          <SkeletonBlock height={72} />
+          <SkeletonBlock height={72} />
+        </div>
+      )}
       {!loading && events.length === 0 && (
         <p className="apple-empty">Belum ada acara pakta. Buat acara pertama Anda.</p>
       )}
