@@ -5,6 +5,7 @@ import { renderPakta } from '../../lib/pdfRenderer';
 import { matchesSignerQuery } from '../../lib/signerFilter';
 import { SignaturePad, type SignaturePadHandle } from './SignaturePad';
 import { PaktaDocumentPreview } from './PaktaDocumentPreview';
+import { SkeletonBlock, SkeletonText } from '../Skeleton';
 
 type PageState =
   | { step: 'loading' }
@@ -43,6 +44,7 @@ export function PaktaSignPage({ slug }: { slug: string }) {
   const [query, setQuery] = useState('');
   const [showSudah, setShowSudah] = useState(false);
   const [submitPhase, setSubmitPhase] = useState<SubmitPhase>('preparing');
+  const [sigError, setSigError] = useState('');
   const sigPadRef = useRef<SignaturePadHandle>(null);
 
   useEffect(() => {
@@ -78,9 +80,10 @@ export function PaktaSignPage({ slug }: { slug: string }) {
     if (state.step !== 'signing') return;
     const pad = sigPadRef.current;
     if (!pad || pad.isEmpty()) {
-      alert('Harap gambar tanda tangan Anda terlebih dahulu.');
+      setSigError('Harap gambar tanda tangan Anda terlebih dahulu.');
       return;
     }
+    setSigError('');
     const { template, signer, backgroundDataUrl } = state;
     setSubmitPhase('preparing');
     setState({ step: 'submitting' });
@@ -147,10 +150,11 @@ export function PaktaSignPage({ slug }: { slug: string }) {
   if (state.step === 'loading') {
     return (
       <div className="apple-page">
-        <div className="apple-page-compact">
-          <p style={{ color: 'var(--color-ink-faint)', textAlign: 'center', marginTop: 64 }}>
-            Memuat acara…
-          </p>
+        <div className="apple-page-compact" style={{ opacity: 0.5, marginTop: 64 }}>
+          <SkeletonText width="60%" height={28} />
+          <div style={{ marginTop: 16 }}>
+            <SkeletonBlock height={160} />
+          </div>
         </div>
       </div>
     );
@@ -304,10 +308,14 @@ export function PaktaSignPage({ slug }: { slug: string }) {
             type="button"
             className="apple-btn apple-btn-danger"
             style={{ width: '100%', marginTop: 12 }}
-            onClick={() => sigPadRef.current?.clear()}
+            onClick={() => { sigPadRef.current?.clear(); setSigError(''); }}
           >
             Hapus Tanda Tangan
           </button>
+
+          {sigError && (
+            <div className="apple-error" style={{ marginTop: 12 }}>{sigError}</div>
+          )}
         </div>
       </div>
     );
